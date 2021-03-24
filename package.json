@@ -1,0 +1,132 @@
+{
+	"name": "save-saver",
+	"version": "0.0.0",
+	"description": "Simply backup and restore save data and configuration files for your games.",
+	"main": "source/main.js",
+	"scripts": {
+		"test": "ava -v ./source/main.test.js",
+		"lint": "eslint ./source/main.js",
+		"generate-docs": "extract-documentation-comments -I source/main.js -O API.md",
+		"update-config": "hjson -j ci/github-actions.hjson | json2yaml --preserve-key-order -o .github/workflows/ci.yml",
+		"update-deps": "npm-check-updates -u",
+		"release": "standard-version",
+		"publish-release": "git push --follow-tags origin main && npm publish"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/Anadian/save-saver.git"
+	},
+	"keywords": [
+		"backup",
+		"restore",
+		"copy",
+		"save",
+		"file",
+		"config",
+		"data",
+		"videogames",
+		"games",
+		"pc",
+		"free",
+		"libre",
+		"open",
+		"source",
+		"mit"
+	],
+	"author": "Anadian",
+	"license": "MIT",
+	"bugs": {
+		"url": "https://github.com/Anadian/save-saver/issues"
+	},
+	"homepage": "https://github.com/Anadian/save-saver#readme",
+	"devDependencies": {
+		"ava": "^3.15.0",
+		"coveralls": "^3.1.0",
+		"hjson": "^3.2.2",
+		"npm-check-updates": "^11.3.0",
+		"nyc": "^15.1.0",
+		"standard-version": "^9.1.1"
+	},
+	"bin": {
+		"save-saver": "./source/main.js"
+	},
+	"engines": {
+		"node": ">=12"
+	},
+	"eslintConfig": {
+		"env": {
+			"commonjs": true,
+			"es6": true,
+			"node": true
+		},
+		"extends": "eslint:recommended",
+		"globals": {
+			"Atomics": "readonly",
+			"SharedArrayBuffer": "readonly"
+		},
+		"parserOptions": {
+			"ecmaVersion": 11
+		},
+		"rules": {
+			"no-unused-vars": [
+				"warn"
+			],
+			"no-useless-escape": "off",
+			"no-empty": "warn"
+		}
+	},
+	"standard-version": {
+		"types": [
+			{
+				"type": "build",
+				"section": "Build",
+				"hidden": false
+			},
+			{
+				"type": "ci",
+				"section": "Continuous Integration",
+				"hidden": false
+			},
+			{
+				"type": "chore",
+				"section": "Chores",
+				"hidden": false
+			},
+			{
+				"type": "docs",
+				"section": "Documentation",
+				"hidden": false
+			},
+			{
+				"type": "feat",
+				"section": "Features",
+				"hidden": false
+			},
+			{
+				"type": "fix",
+				"section": "Bug Fixes",
+				"hidden": false
+			},
+			{
+				"type": "perf",
+				"section": "Performance",
+				"hidden": false
+			},
+			{
+				"type": "refactor",
+				"section": "Refactoring",
+				"hidden": false
+			},
+			{
+				"type": "style",
+				"section": "Code Style",
+				"hidden": false
+			},
+			{
+				"type": "test",
+				"section": "Tests",
+				"hidden": false
+			}
+		]
+	}
+}
