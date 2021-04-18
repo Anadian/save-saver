@@ -1,0 +1,54 @@
+{
+	//"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"title": "NewSource",
+	"description": "A JSON schema describing the format for objects passed to the NewSource function.",
+	"type": "object",
+	"properties": {
+		name: {
+			type: "string",
+			description: "The primary name of the new source entry.",
+			pattern: "^[A-Za-z0-9_-]+$"
+		},
+		aliases: {
+			type: "array",
+			description: "An array of strings containing any aliases the source entry will also go by.",
+			uniqueItems: true,
+			items: {
+				"$ref": "#/$defs/URLSafeString"
+			}
+		},
+		paths: {
+			type: "object",
+			description: "The paths, divided into subsections and then divided in include/exclude globs, of the files related to this source.",
+			patternProperties: {
+				"^[A-Za-z0-9_-]+$": {
+					"$refs": "#/$defs/PathSubSection"
+				}
+			}
+		},
+	},
+	"$defs":{
+		URLSafeString: {
+			type: "string",
+			pattern: "^[A-Za-z0-9_-]+$"
+		},
+		ArrayOfGlobs: {
+			type: "array",
+			items: {
+				type: "string"
+			}
+		},
+		PathSubSection: {
+			type: "object",
+			properties: {
+				include: {
+					"$ref": "#/$defs/ArrayOfGlobs"
+				},
+				exclude: {
+					"$ref": "#/$defs/ArrayOfGlobs"
+				}
+			},
+			required: [ "include" ]
+		}
+	}
+}
