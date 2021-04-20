@@ -314,70 +314,6 @@ function loadConfigFile( config_filepath = '' ){
 	}
 }
 /**
-### loadConfigObjectFromPath
-> Loads the config object from the given path.
-
-Parametres:
-| name | type | description |
-| --- | --- | --- |
-| config_filepath | {String} | The path of the config file to load.  |
-| options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
-
-Throws:
-| code | type | condition |
-| --- | --- | --- |
-| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
-
-History:
-| version | change |
-| --- | --- |
-| 0.0.1 | WIP |
-*/
-function loadConfigObjectFromPath( config_filepath, options = {} ){
-	var arguments_array = Array.from(arguments);
-	var return_error;
-	const FUNCTION_NAME = 'loadConfigObjectFromPath';
-	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
-	//Variables
-	var config_file_string = '';
-	var parse_object = {};
-	//Parametre checks
-	if( typeof(config_filepath) !== 'string' ){
-		return_error = new TypeError('Param "config_filepath" is not String.');
-		return_error.code = 'ERR_INVALID_ARG_TYPE';
-		throw return_error;
-	}
-	if( typeof(options) !== 'object' ){
-		return_error = new TypeError('Param "options" is not ?Object.');
-		return_error.code = 'ERR_INVALID_ARG_TYPE';
-		throw return_error;
-	}
-
-	//Function
-	try{
-		config_file_string = FileSystem.readFileSync( config_filepath, 'utf8' ).replace( /\r\n/g, '\n' );
-	} catch(error){
-		return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'warn', message: return_error});
-		if( (error instanceof SystemError) && (error.code === 'ENOENT') ){
-			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: 'No config file found; attempting to create a new one.'});
-		} else{
-			return_error = new Error(`FileSystem.readFileSync threw an unrecoverable error: ${error}`);
-			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'crit', message: return_error});
-			throw return_error;
-		}
-		//throw return_error;
-	}
-	if( config_file_string !== '' ){
-		try{
-			parsed_object = HJSON.parse( config_file_string );
-		} catch(error){
-			return_error = new Error(`HJSON.parse threw an error: ${error}`);
-			throw return_error;
-		}
-	}
-}
-/**
 ### loadPersistentDataObjects_Async (private)
 > Loads any existing data to the global `PathsObject` and `BackupsObject`. Not exported and should never be manually called.
 
@@ -602,19 +538,16 @@ if(require.main === module){
 	//##Dependencies
 		//###Internal
 		//###Standard
-		const Path = require('path');
 		//###External
-		const MakeDir = require('make-dir');
 		const ApplicationLogWinstonInterface = require('application-log-winston-interface');
 		const EnvPaths = require('env-paths');
-		const HJSON = require('hjson');
 		const CommandLineCommands = require('command-line-commands');
 		const CommandLineArgs = require('command-line-args');
 		const CommandLineUsage = require('command-line-usage');
 	//Constants
 	//EnvironmentPaths = EnvPaths( PROCESS_NAME );
 	const CLIDefintions = [
-		{ name: null, options: [
+		{ name: null, description: 'Simply backup and restore save data and configuration files for your games.', synopsis: '$ save-saver (options)', options: [
 			//UI
 			{ name: 'help', alias: 'h', type: Boolean, description: 'Writes this help text to STDOUT.' },
 			{ name: 'noop', alias: 'n', type: Boolean, description: '[Reserved] Show what would be done without actually doing it.' },
@@ -636,7 +569,9 @@ if(require.main === module){
 			{ name: 'override-backups-object-path', type: String, description: 'Specify a path to read the BackupsObject from instead of the default. Takes precedent over `override-data-directory-path`.' },
 			{ name: 'override-data-directory-path', type: String, description: 'Specify a directory to search for the PathsObject and BackupsObject files instead of the default.' }
 		] },
-		{ name: 'help', description: 'Writes a helpful synopsis for the given subcommand to STDOUT.', synopsis: '$ save-saver help <subcommand>', options: null },
+		{ name: 'help', description: 'Writes a helpful synopsis for the given subcommand to STDOUT.', synopsis: '$ save-saver help <subcommand>', options: [
+			{ name: 'subcommand', alias: 'S', type: String, multiple: true, defaultOption: true, description: 'The subcommand(s) to write help text for.' }
+		] },
 		{ name: 'add-source', description: 'Adds a new source to the `Paths.json` index file.', synopsis: '$ save-saver add-source (options)', options: [
 			{ name: 'force', alias: 'f', type: Boolean, description: 'Do not ask for comfirmation in the new source would overwrite an existing one.' },
 			{ name: 'edit', alias: 'e', type: Boolean, description: 'Edit the source record in $EDITOR.' },
@@ -659,11 +594,15 @@ if(require.main === module){
 			{ name: 'automatic', alias: 'a', type: Boolean, description: 'Automatically backup any sources that have been changed since the last run.' }
 		] },
 		{ name: 'list-backups', description: 'Lists the backups for the given source.', synopsis: '$ save-saver list-backups <source> (options)', options: [
-			{ name: 'oldest', alias: 'o', type: Boolean, description: 'Invert the list order to show the oldest at the bottum.' },
+			{ name: 'oldest', alias: 'o', type: Boolean, description: 'Invert the list order to show the oldest at the bottom.' },
 			{ name: 'count', alias: 'C', type: Number, defaultValue: 10, description: 'Specifies how many backups to show in the resulting list. [Default: 10]' }
 		] },
-		'restore',
-		'delete-backup'
+		{ name: 'restore', description: 'Restores the backup with the given ID.', synposis: '$ save-saver restore <backup ID> (options)', options: [
+			{ name: 'id', alias: 'I', type: String, defaultOption: true, description: 'The ID of the backup to be restored.' }
+		] },
+		{ name: 'delete-backup', description: 'Deletes the backup with the given ID.', synopsis: '$ save-saver delete-backup <backup ID> (options)', options: [
+			{ name: 'id', alias: 'I', type: String, defaultOption: true, description: 'The ID of the backup to be deleted.' }
+		] }
 	];
 	//Variables
 	var function_return = [1,null];
@@ -673,9 +612,23 @@ if(require.main === module){
 	var parent_dirname = '';
 	var package_path = '';
 	var env_paths_object = {};
-	var config_file_string = '';
-	var config_file_path = '';
-	var config_object = {};
+	var commands_array = [];
+	var global_options = {};
+	var command = '';
+	var command_options = {};
+	//EnvironmentPaths
+	try{
+		env_paths_object = EnvPaths('save-saver');
+		try{
+			setEnvironmentPaths( env_paths_object );
+		} catch(error){
+			return_error = new Error(`setEnvironmentPaths threw an error: ${error}`);
+			throw return_error;
+		}
+	} catch(error)/* istanbul ignore next */{
+		return_error = new Error(`EnvPaths threw an error: ${error}`);
+		throw return_error;
+	}
 	//Logger
 	try{ 
 		MakeDir.sync( EnvironmentPaths.log );
@@ -687,8 +640,35 @@ if(require.main === module){
 		setLogger( function_return[1] );
 	}
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: 'Start of execution block.'});
-	//Options
-	var Options = CommandLineArgs( OptionDefinitions );
+	//#### CLI
+	//##### Options
+	for( var i = 0; i < CLIDefinitions.length; i++ ){
+		commands_array.push( CLIDefinitions[i].name );
+	}
+	try{
+		global_options = CommandLineArgs( CLIDefinitions[0], { stopAtFirstUnknown: true } );
+	} catch(error)/* istanbul ignore next */{
+		return_error = new Error(`CommandLineArgs threw an error: ${error}`);
+		throw return_error;
+	}
+	try{
+		command = CommandLineCommands( commands_array );
+	} catch(error)/* istanbul ignore next */{
+		return_error = new Error(`CommandLineCommands threw an error: ${error}`);
+		throw return_error;
+	}
+	if( command != null ){
+		for( var i = 0; i < CLIDefinitions.length; i++ ){
+			if( command === CLIDefinitions[i].name ){
+				try{
+					command_options = CommandLineArgs( CLIDefinitions[i].options );
+				} catch(error)js\iin{
+					return_error = new Error(`CommandLineArgs threw an error: ${error}`);
+					throw return_error;
+				}
+			}
+		}
+	}
 	//Config
 	try{
 		MakeDir.sync( EnvironmentPaths.data );
@@ -716,30 +696,19 @@ if(require.main === module){
 		//throw return_error;
 		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
 	}
-	//Load config.json
-	if( Options['config-file'] !== '' ){
-		try{
-			loadConfigObjectFromPath( Options['config-file'] );
-		} catch(error){
-			return_error = new Error(`loadConfigObjectFromPath threw an error: ${error}`);
-			throw return_error;
+	//Load config.hjson
+	try{
+		if( global_options['config-file'] !== '' ){
+			loadConfigFile( global_options['config-file'] );
+		} else{
+			loadConfigFile();
 		}
-	} else{
-		try{
-			config_path = Path.join( EnvironmentPaths.config, 'config.hjson' );
-		} catch(error){
-			return_error = new Error(`Path.join threw an error: ${error}`);
-			throw return_error;
-		}
-		try{
-			loadConfigObjectFromPath( config_path );
-		} catch(error){
-			return_error = new Error(`loadConfigObjectFromPath threw an error: ${error}`);
-			throw return_error;
-		}
+	} catch(error){
+		return_error = new Error(`loadConfigFile threw an error: ${error}`);
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
 	}
 	/* istanbul ignore next */
-	if( Options.verbose === true ){
+	if( global_options.verbose === true ){
 		Logger.real_transports.console_stderr.level = 'debug';
 		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `Logger: console_stderr transport log level set to: ${Logger.real_transports.console_stderr.level}`});
 	}
@@ -760,12 +729,12 @@ if(require.main === module){
 	}
 	//Main
 	/* istanbul ignore next */
-	if( Options.version === true ){
+	if( global_options.version === true ){
 		console.log(PACKAGE_JSON.version);
 		quick_exit = true;
 	}
 	/* istanbul ignore next */
-	if( Options.help === true ){
+	if( global_options.help === true ){
 //		{ name: 'help', usage: [
 //			{
 //				header: 'help',
@@ -784,11 +753,11 @@ if(require.main === module){
 			},
 			{
 				header: 'Commands',
-				content: []
+				content: commands_array
 			},
 			{
-				header: 'Options',
-				optionList: OptionDefinitions
+				header: 'Global Options',
+				optionList: CLIDefinitions[0].options
 			}
 		]
 		const help_message = CommandLineUsage(help_sections_array);
@@ -796,15 +765,16 @@ if(require.main === module){
 		quick_exit = true;
 	}
 	/* istanbul ignore next */
-	if( Options.config === true ){
+	if( global_options.config === true ){
 		console.log('Paths: ', EnvironmentPaths);
 		console.log('Config file path: ', config_path);
 		console.log('Config; ', ConfigObject);
 		quick_exit = true;
 	}
-	if( quick_exit === false || Options['no-quick-exit'] === true ){
+	if( quick_exit === false || global_options['no-quick-exit'] === true ){
 		/* istanbul ignore next */
-		main_Async( Options );
+		//##### Commands
+		main_Async( global_options );
 	}
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: 'End of execution block.'});
 } else{
