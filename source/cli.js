@@ -60,8 +60,8 @@ if(require.main === module){
 } else{
 	PROCESS_NAME = process.argv0;
 }
-const CLIDefintions = [
-	{ name: null, description: 'Simply backup and restore save data and configuration files for your games.', synopsis: '$ save-saver (options)', options: [
+const CLIDefinitions = [
+	{ name: null, description: 'Simply backup and restore save data and configuration files for your games.', synopsis: '$ save-saver [options]', options: [
 		//UI
 		{ name: 'help', alias: 'h', type: Boolean, description: 'Writes this help text to STDOUT.' },
 		{ name: 'noop', alias: 'n', type: Boolean, description: '[Reserved] Show what would be done without actually doing it.' },
@@ -78,8 +78,8 @@ const CLIDefintions = [
 	] },
 	{ name: 'help', description: 'Writes a helpful synopsis for the given subcommand to STDOUT.', synopsis: '$ save-saver help <subcommand>', options: [
 		{ name: 'subcommand', alias: 'S', type: String, multiple: true, defaultOption: true, description: 'The subcommand(s) to write help text for.' }
-	] },
-	{ name: 'add-source', description: 'Adds a new source to the `Paths.json` index file.', synopsis: '$ save-saver add-source (options)', options: [
+	], func: CLI_Command_Help },
+	{ name: 'add-source', description: 'Adds a new source to the `Paths.json` index file.', synopsis: '$ save-saver add-source [options]', options: [
 		{ name: 'force', alias: 'f', type: Boolean, description: 'Do not ask for comfirmation in the new source would overwrite an existing one.' },
 		{ name: 'edit', alias: 'e', type: Boolean, description: 'Edit the source record in $EDITOR.' },
 		{ name: 'name', alias: 'N', type: String, defaultOption: true, description: 'The name of the source as it will appear in `Paths.json`.' },
@@ -88,7 +88,7 @@ const CLIDefintions = [
 		{ name: 'saves', alias: 'S', type: String, description: 'A glob for the save files to backup.' },
 		{ name: 'data', alias: 'D', type: String, description: 'A glob for the data files to backup.' }
 	] },
-	{ name: 'list-sources', description: 'List the sources currently present in `Paths.json`.' synopsis: '$ save-saver list-sources (options)', options: [
+	{ name: 'list-sources', description: 'List the sources currently present in `Paths.json`.', synopsis: '$ save-saver list-sources (options)', options: [
 		{ name: 'alias', alias: 'a', type: Boolean, description: 'Include aliases in the list.' }
 	] },
 	{ name: 'remove-source', description: 'Removes a source and its aliases from `Paths.json`.', synopsis: '$ save-saver remove-source (options) <sources...>', options: [
@@ -97,7 +97,7 @@ const CLIDefintions = [
 		{ name: 'with-backups', alias: 'a', type: Boolean, description: 'Delete any existing backups belonging to the source aswell.' }
 	] },
 	{ name: 'backup', description: 'Creates a new backup for the given source.', synopsis: '$ save-saver backup (options) <source name> <subsource>', options: [
-		{ name: 'message', alias: 'm', type: String, description: 'A message to associate with the backup.' }
+		{ name: 'message', alias: 'm', type: String, description: 'A message to associate with the backup.' },
 		{ name: 'automatic', alias: 'a', type: Boolean, description: 'Automatically backup any sources that have been changed since the last run.' }
 	] },
 	{ name: 'list-backups', description: 'Lists the backups for the given source.', synopsis: '$ save-saver list-backups <source> (options)', options: [
@@ -244,11 +244,496 @@ function setEnvironmentPaths( environment_paths ){
 
 	//Function
 	if( environment_paths != null ){
-		EnvironmentPaths = environmnet_paths;
+		EnvironmentPaths = environment_paths;
 	} else{
 		return_error = new Error('Param `environment_paths` is `null`.');
 		return_error.code = 'ERR_INVALID_ARG_VALUE';
 		throw return_error;
+	}
+}
+/**
+### loadConfigFile (Private)
+> Loads the config file. This function is private and should only be called once from the main execution block.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| config_filepath | {?string} | Optionally specify a runtime-specific config file to load instead of the default. \[default: \] |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.0 | Introduced |
+*/
+function loadConfigFile( config_filepath = '' ){
+	var arguments_array = Array.from(arguments);
+	var return_error;
+	const FUNCTION_NAME = 'loadConfigFile';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	var config_file_string = '';
+	var config_file_path = '';
+	var config_object = {};
+	//Parametre checks
+	if( typeof(config_filepath) !== 'string' ){
+		return_error = new TypeError('Param "config_filepath" is not a string.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	if( typeof(config_filepath) === 'string' && config_filepath != '' ){
+		try{
+			config_file_string = FileSystem.readFileSync( config_flepath, 'utf8' ).replace( /\r\n/g, '\n' );
+		} catch(error){
+			return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'warn', message: return_error});
+			throw return_error;
+		}
+	} else{
+		try{
+			config_file_path = Path.join( EnvironmentPaths.config, 'config.hjson' );
+			try{
+				config_file_string = FileSystem.readFileSync( config_file_path, 'utf8' );
+			} catch(error){
+				Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: error});
+				if( /*error instanceof SystemError &&*/ error.code === 'ENOENT' ){
+					//Create a new config file.
+					try{
+						setConfigObject( null );
+						try{
+							config_file_string = JSON.stringify( ConfigObject, null, '\t' );
+							try{
+								MakeDir.sync( EnvironmentPaths.config );
+								try{
+									FileSystem.writeFileSync( config_file_path, config_file_string, 'utf8' );
+								} catch(error)/* istanbul ignore next */{
+									return_error = new Error(`FileSystem.writeFileSync threw an error: ${error}`);
+									Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+									throw return_error;
+								}
+							} catch(error){
+								return_error = new Error(`MakeDir.sync threw an error: ${error}`);
+								Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+								throw return_error;
+							}
+						} catch(error)/* istanbul ignore next */{
+							return_error = new Error(`JSON.stringify threw an error: ${error}`);
+							Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+							throw return_error;
+						}
+					} catch(error)/* istanbul ignore next */{
+						return_error = new Error(`setConfigObject threw an error: ${error}`);
+						Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+						throw return_error;
+					}
+				} else/* istanbul ignore next */{
+					return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
+					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+					throw return_error;
+				}
+			}
+		} catch(error){
+			return_error = new Error(`Path.join threw an error: ${error}`);
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+			throw return_error;
+		}
+	}
+	try{
+		config_object = HJSON.parse( config_file_string );
+		try{
+			setConfigObject( config_object );
+		} catch(error){
+			return_error = new Error(`setConfigObject threw an error: ${error}`);
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+			throw return_error;
+		}
+	} catch(error){
+		return_error = new Error(`HJSON.parse threw an error: ${error}`);
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+		throw return_error;
+	}
+}
+/**
+### loadPersistentDataObjects_Async (private)
+> Loads any existing data to the global `PathsObject` and `BackupsObject`. Not exported and should never be manually called.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| data_path | {String} | The path to search for the `Paths.json` and `Backups.json` files in if not overridden by the runtime options.  |
+| options | {?Object} | Additional run-time options. Paths can be overridden from command-line/config options. \[default: {}\] |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+async function loadPersistentDataObjects_Async( data_path, options = {} ){
+	var arguments_array = Array.from(arguments);
+	var return_error;
+	const FUNCTION_NAME = 'loadPersistentDataObjects_Async';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	var paths_object_path = '';
+	var backups_object_path = '';
+	//var paths_json_string_promise = null;
+	//var backups_json_string_promise = null;
+	var paths_object_promise = null;
+	var backups_object_promise = null;
+	var eol_fix_function = data_string => { return data_string.replace( /\r\n/g, '\n' ); };
+	var parse_json_function = json_string => {
+		var _return = null;
+		var return_error = null;
+		try{
+			_return = ParseJSON( json_string, null, null );
+		} catch(error){
+			return_error = new Error(`ParseJSON threw an error: ${error}`);
+			throw return_error;
+		}
+		return _return;
+	};
+	//Parametre checks
+	if( typeof(data_path) !== 'string' ){
+		return_error = new TypeError('Param "data_path" is not String.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+	if( typeof(options) !== 'object' ){
+		return_error = new TypeError('Param "options" is not ?Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	if( options['override-paths-object-path'] != null ){
+		paths_object_path = options['override-paths-object-path'];
+	} else{
+		try{
+			paths_object_path = Path.join( EnvironmentPaths.data, 'Paths.json' );
+		} catch(error){
+			return_error = new Error(`Path.join threw an error: ${error}`);
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: `${return_error}`});
+			throw return_error;
+		}
+	}
+	if( paths_object_path !== '' ){
+		try{
+			FileSystem.accessSync( paths_object_path );
+			try{
+				paths_object_promise = FileSystem.promises.readFile( paths_object_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
+			} catch(error){
+				return_error = new Error(`FileSystem.promises.readFile threw an error: ${error}`);
+				throw return_error;
+			}
+		} catch(error){
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `FileSystem.accessSync threw an error: ${error}`});
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: '`Paths.json` does not exist; attempting to create one.'});
+			paths_object_promise = Promise.resolve( {} );
+		}
+	}
+	if( options['override-backups-object-path'] != null ){
+		backups_object_path = options['override-backups-object-path'];
+	} else{
+		try{
+			backups_object_path = Path.join( EnvironmentPaths.data, 'Backups.json' );
+		} catch(error){
+			return_error = new Error(`Path.join threw an error: ${error}`);
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: `${return_error}`});
+			throw return_error;
+		}
+	}
+	if( backups_object_path !== '' ){
+		try{
+			FileSystem.accessSync( backups_object_path );
+			try{
+				backups_object_promise = FileSystem.promises.readFile( backups_object_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
+			} catch(error){
+				return_error = new Error(`FileSystem.promises.readFile threw an error: ${error}`);
+				throw return_error;
+			}
+		} catch(error){
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `FileSystem.accessSync threw an error: ${error}`});
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: '`Backups.json` does not exist; attempting to create one.'});
+			backups_object_promise = Promise.resolve( {} );
+		}
+	}
+
+	try{
+		SaveSaver.setPathsObject( await paths_object_promise );
+	} catch(error){
+		return_error = new Error(`SaveSaver.setPathsObject threw an error: ${error}`);
+		throw return_error;
+	}
+	try{
+		SaveSaver.setBackupsObject( await backups_object_promise );
+	} catch(error){
+		return_error = new Error(`SaveSaver.setBackupsObject threw an error: ${error}`);
+		throw return_error;
+	}
+}
+/**
+### CLI_Command_Help (Async)
+> Implements the `help` subcommand.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| command_options | {Object} | The options specific to the subcommand. \[default: {}\] |
+| options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+async function CLI_Command_Help( command_options = {}, options = {} ){
+	var arguments_array = Array.from(arguments);
+	var return_error = null;
+	const FUNCTION_NAME = 'CLI_Command_Help';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	var subcommand_help = '';
+	//Parametre checks
+	if( typeof(command_options) !== 'object' ){
+		return_error = new TypeError('Param "command_options" is not an Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		//throw return_error;
+	}
+	if( typeof(options) !== 'object' ){
+		return_error = new TypeError('Param "options" is not an Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		//throw return_error;
+	}
+
+	//Function
+	for( var i = 0; i < command_options.subcommand.length; i++ ){
+		for( var j = 1; j < CLIDefinitions.length; j++ ){
+			if( command_options.subcommand[i] === CLIDefinitions[j].name ){
+				subcommand_help = CommandLineUsage( [
+					{
+						header: CLIDefinitions[j].name,
+						content: CLIDefinitions[j].description
+					},
+					{
+						header: 'Synopsis',
+						content: CLIDefinitions[j].synopsis
+					},
+					{
+						header: 'Options',
+						optionList: CLIDefinitions[j].options
+					}
+				] );
+				console.log( subcommand_help );
+			}
+		}
+	}
+
+	//Exit
+	if( return_error !== null ){
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'crit', message: return_error});
+		process.exitCode = 1;
+	}
+}
+/**
+### CLI_Command_AddSource (Async)
+> Adds a new source object to the `Paths.json` object.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| command_options | {Object} | The options passed to the `add-source` command. \[default: {}\] |
+| global_options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+async function CLI_Command_AddSource( command_options = {}, global_options = {} ){
+	var arguments_array = Array.from(arguments);
+	var return_error;
+	const FUNCTION_NAME = 'CLI_Command_AddSource';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	const inquirer_questions = [
+		{
+			type: 'editor',
+			name: 'content',
+			message: '',
+			default: `{
+	"name": "NewSource",
+	"aliases": [
+		"ns"
+	],
+	"paths": {
+		"saves": {
+			"include": "",
+			"exclude": null
+		},
+		"config": {
+			"include": "",
+			"exclude": null
+		},
+		"data": {
+			"include": "",
+			"exclude": null
+		}
+	}
+}`
+		}
+	];
+	//Variables
+	var existing_source_object = null;
+	var new_source_object = {};
+	var inquirer_answer = {};
+	//Parametre checks
+	if( typeof(command_options) !== 'object' ){
+		return_error = new TypeError('Param "command_options" is not Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+	if( typeof(global_options) !== 'object' ){
+		return_error = new TypeError('Param "global_options" is not ?Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	try{
+		if( typeof(command_options.name) === 'string' && command_options.name != null ){
+			try{
+				existing_source_object = SaveSaver.getSourceObject( command_options.name );
+				Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'warn', message: `A source object already exists with the given name.`});
+				if( command_options.force === true ){
+					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'warn', message: 'Overwriting existing record.'});
+				} else{
+					return_error = new Error('A source object with that name already exists. Pass `--force` to overwrite it.');
+					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+				}
+			} catch(error){
+				if( error.code === 'ERR_INVALID_ARG_VALUE' ){
+					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `No source object with the name "${command_options.name}" exists so we'll create a new one.`});
+				} else{
+					return_error = new Error(`SaveSaver.getSourceObject threw an unexpected error: ${error}`);
+					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+				}
+			}
+		} else if( command_options.edit === true ){
+			try{
+				inquirer_answer = await Inquirer.prompt( iqnuirer_questions );
+			} catch(error){
+				return_error = new Error(`await Inquirer.prompt threw an error: ${error}`);
+				throw return_error;
+			}
+			try{
+				new_source_object = HJSON.parse( inquirer_answer.content );
+			} catch(error){
+				return_error = new Error(`HJSON.parse threw an error: ${error}`);
+				throw return_error;
+			}
+		} else{
+			if( return_error == null ){
+				new_source_object = {
+					name: command_options.name,
+					aliases: command_options.aliases,
+					paths: {}
+				};
+				if( command_options.data != null && typeof(command_options.data) === 'string' ){
+					new_source_object.paths.data = {
+						include: [ command_options.data ]
+					}
+				}
+				if( command_options.config != null && typeof(command_options.config) === 'string' ){
+					new_source_object.paths.config = {
+						include: [ command_options.config ]
+					}
+				}
+				if( command_options.saves != null && typeof(command_options.saves) === 'string' ){
+					new_source_object.paths.saves = {
+						include: [ command_options.saves ]
+					}
+				}
+			}
+		}
+		if( new_source_object != null && typeof(new_source_object) === 'object' ){
+			try{
+				SaveSaver.setSourceObject( new_source_object );
+			} catch(error){
+				return_error = new Error(`SaveSaver.setSourceObject threw an error: ${error}`);
+				throw return_error;
+			}
+		}
+	} catch(error){
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'crit', message: error});
+		process.exitCode = 1;
+	}
+}
+/**
+### main_Async (private)
+> The main function when the script is run as an executable. Not exported and should never be manually called.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| options | {?options} | An object representing the command-line options. \[default: {}\] |
+
+Status:
+| version | change |
+| --- | --- |
+| 0.0.1 | Introduced |
+*/
+/* istanbul ignore next */
+async function main_Async( options = {} ){
+	var arguments_array = Array.from(arguments);
+	var return_error = null;
+	const FUNCTION_NAME = 'main_Async';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	//Parametre checks
+	//Function
+	try{
+		await loadPersistentDataObjects_Async( EnvironmentPaths.data, options );
+		/*try{
+			SaveSaver.setSourcePathsObject( PathsObject );
+			try{
+				SaveSaver.setBackupsObject( BackupsObject );
+			} catch(error){
+				return_error = new Error(`SaveSaver.setBackupsObject threw an error: ${error}`);
+				//throw return_error;
+			}
+		} catch(error){
+			return_error = new Error(`SaveSaver.setSourcePathsObject threw an error: ${error}`);
+			//throw return_error;
+		}*/
+	} catch(error){
+		return_error = new Error(`await loadPersistentDataObjects_Async threw an error: ${error}`);
+		//throw return_error;
+	}
+
+	//Return
+	if( return_error !== null ){
+		process.exitCode = 1;
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'crit', message: return_error.message});
 	}
 }
 
@@ -262,6 +747,7 @@ if(require.main === module){
 		//### External
 	//Variables
 	var function_return = [1,null];
+	var logger = null;
 	var quick_exit = false;
 	var config_path = '';
 	var source_dirname = '';
@@ -292,9 +778,23 @@ if(require.main === module){
 	} catch(error)/* istanbul ignore next */{
 		console.error('MakeDir.sync threw: %s', error);
 	}
-	function_return = ApplicationLogWinstonInterface.InitLogger('debug.log', EnvironmentPaths.log);
-	if( function_return[0] === 0 ){
-		setLogger( function_return[1] );
+	try{
+		logger = ApplicationLogWinstonInterface.initWinstonLogger( 'debug.log', EnvironmentPaths.log );
+		try{
+			setLogger( logger );
+		} catch(error){
+			return_error = new Error(`setLogger threw an error: ${error}`);
+			console.error(return_error);
+		}
+		try{
+			SaveSaver.setLogger( logger );
+		} catch(error){
+			return_error = new Error(`SaveSaver.setLogger threw an error: ${error}`);
+			console.error(return_error);
+		}
+	} catch(error){
+		return_error = new Error(`ApplicationLogWinstonInterface.initWinstonLogger threw an error: ${error}`);
+		console.error(return_error);
 	}
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: 'Start of execution block.'});
 	//#### CLI
@@ -303,22 +803,25 @@ if(require.main === module){
 		commands_array.push( CLIDefinitions[i].name );
 	}
 	try{
-		global_options = CommandLineArgs( CLIDefinitions[0], { stopAtFirstUnknown: true } );
+		global_options = CommandLineArgs( CLIDefinitions[0].options, { stopAtFirstUnknown: true } );
 	} catch(error)/* istanbul ignore next */{
 		return_error = new Error(`CommandLineArgs threw an error: ${error}`);
 		throw return_error;
 	}
 	try{
-		command = CommandLineCommands( commands_array );
+		command = CommandLineCommands( commands_array, global_options._unknown );
+		console.log(command, commands_array);
 	} catch(error)/* istanbul ignore next */{
 		return_error = new Error(`CommandLineCommands threw an error: ${error}`);
 		throw return_error;
 	}
 	if( command != null ){
 		for( var i = 0; i < CLIDefinitions.length; i++ ){
-			if( command === CLIDefinitions[i].name ){
+			if( command.command === CLIDefinitions[i].name ){
 				try{
-					command_options = CommandLineArgs( CLIDefinitions[i].options );
+					console.log( i, CLIDefinitions[i], command.argv );
+					command_options = CommandLineArgs( CLIDefinitions[i].options, { argv: command.argv } );
+					//CLIDefinitions[i].func( command_options, global_options )
 				} catch(error)/* istanbul ignore next */{
 					return_error = new Error(`CommandLineArgs threw an error: ${error}`);
 					throw return_error;
@@ -355,7 +858,7 @@ if(require.main === module){
 	}
 	//Load config.hjson
 	try{
-		if( global_options['config-file'] !== '' ){
+		if( typeof(global_options['config-file']) === 'string' && global_options['config-file'] != '' ){
 			loadConfigFile( global_options['config-file'] );
 		} else{
 			loadConfigFile();
@@ -363,6 +866,73 @@ if(require.main === module){
 	} catch(error){
 		return_error = new Error(`loadConfigFile threw an error: ${error}`);
 		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+	}
+	/* istanbul ignore next */
+	if( global_options.verbose === true ){
+		Logger.real_transports.console_stderr.level = 'debug';
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `Logger: console_stderr transport log level set to: ${Logger.real_transports.console_stderr.level}`});
+	}
+	///Load package.json
+	try{
+		source_dirname = Path.dirname( module.filename );
+		package_path = Path.join( source_dirname, 'package.json' );
+		PACKAGE_JSON = require(package_path);
+	} catch(error){
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `Soft error: ${error}`});
+		try{
+			parent_dirname = Path.dirname( source_dirname );
+			package_path = Path.join( parent_dirname, 'package.json' );
+			PACKAGE_JSON = require(package_path);
+		} catch(error)/* istanbul ignore next */{
+			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `Soft error: ${error}`});
+		}
+	}
+	//Main
+	/* istanbul ignore next */
+	if( global_options.version === true ){
+		console.log(PACKAGE_JSON.version);
+		quick_exit = true;
+	}
+	if( global_options.help === true ){
+		var commands_list = [];
+		for( var i = 1; i < CLIDefinitions.length; i++ ){
+			commands_list.push( { name: CLIDefinitions[i].name, summary: CLIDefinitions[i].description } );
+		}
+		const help_sections_array = [
+			{
+				header: 'save-saver',
+				content: 'Simply backup and restore save data and configuration files for your games.',
+			},
+			{
+				header: 'Commands',
+				content: commands_list
+			},
+			{
+				header: 'Global Options',
+				optionList: CLIDefinitions[0].options
+			}
+		]
+		const help_message = CommandLineUsage(help_sections_array);
+		console.log(help_message);
+		quick_exit = true;
+	}
+	/* istanbul ignore next */
+	if( global_options.config === true ){
+		console.log('Paths: ', EnvironmentPaths);
+		console.log('Default config file path: ', Path.join( EnvironmentPaths.config, 'config.hjson' ));
+		console.log('Config; ', ConfigObject);
+		quick_exit = true;
+	}
+	if( quick_exit === false || global_options['no-quick-exit'] === true ){
+		/* istanbul ignore next */
+		//##### Commands
+		//main_Async( global_options );
+		//console.log(command);
+		for( var i = 0; i < CLIDefinitions.length; i++ ){
+			if( command.command === CLIDefinitions[i].name ){
+				CLIDefinitions[i].func( command_options, global_options );
+			}
+		}
 	}
 } else{
 	exports.setLogger = setLogger;

@@ -207,113 +207,6 @@ function setEnvironmentPaths( environment_paths ){
 	}
 }
 /**
-### loadConfigFile (Private)
-> Loads the config file. This function is private and should only be called once from the main execution block.
-
-Parametres:
-| name | type | description |
-| --- | --- | --- |
-| config_filepath | {?string} | Optionally specify a runtime-specific config file to load instead of the default. \[default: \] |
-
-Throws:
-| code | type | condition |
-| --- | --- | --- |
-| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
-
-History:
-| version | change |
-| --- | --- |
-| 0.0.0 | Introduced |
-*/
-function loadConfigFile( config_filepath = '' ){
-	var arguments_array = Array.from(arguments);
-	var return_error;
-	const FUNCTION_NAME = 'loadConfigFile';
-	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
-	//Variables
-	var config_file_string = '';
-	var config_file_path = '';
-	var config_object = {};
-	//Parametre checks
-	if( typeof(config_filepath) !== 'string' ){
-		return_error = new TypeError('Param "config_filepath" is not a string.');
-		return_error.code = 'ERR_INVALID_ARG_TYPE';
-		throw return_error;
-	}
-
-	//Function
-	if( config_filepath !== '' ){
-		try{
-			config_file_string = FileSystem.readFileSync( config_flepath, 'utf8' ).replace( /\r\n/g, '\n' );
-		} catch(error){
-			return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
-			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'warn', message: return_error});
-			throw return_error;
-		}
-	} else{
-		try{
-			config_file_path = Path.join( EnvironmentPaths.config, 'config.hjson' );
-			try{
-				config_file_string = FileSystem.readFileSync( config_file_path, 'utf8' );
-			} catch(error){
-				if( error instanceof SystemError && error.code === 'ENOENT' ){
-					//Create a new config file.
-					try{
-						setConfigObject( null );
-						try{
-							config_file_string = JSON.stringify( ConfigObject, null, '\t' );
-							try{
-								MakeDir.sync( EnvironmentPaths.config );
-								try{
-									FileSystem.writeFileSync( config_file_path, config_file_string, 'utf8' );
-								} catch(error)/* istanbul ignore next */{
-									return_error = new Error(`FileSystem.writeFileSync threw an error: ${error}`);
-									Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-									throw return_error;
-								}
-							} catch(error){
-								return_error = new Error(`MakeDir.sync threw an error: ${error}`);
-								Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-								throw return_error;
-							}
-						} catch(error)/* istanbul ignore next */{
-							return_error = new Error(`JSON.stringify threw an error: ${error}`);
-							Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-							throw return_error;
-						}
-					} catch(error)/* istanbul ignore next */{
-						return_error = new Error(`setConfigObject threw an error: ${error}`);
-						Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-						throw return_error;
-					}
-				} else/* istanbul ignore next */{
-					return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
-					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error)});
-					throw return_error;
-				}
-			}
-		} catch(error){
-			return_error = new Error(`Path.join threw an error: ${error}`);
-			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-			throw return_error;
-		}
-	}
-	try{
-		config_object = HJSON.parse( config_file_string );
-		try{
-			setConfigObject( config_object );
-		} catch(error){
-			return_error = new Error(`setConfigObject threw an error: ${error}`);
-			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-			throw return_error;
-		}
-	} catch(error){
-		return_error = new Error(`HJSON.parse threw an error: ${error}`);
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-		throw return_error;
-	}
-}
-/**
 ### loadPersistentDataObjects_Async (private)
 > Loads any existing data to the global `PathsObject` and `BackupsObject`. Not exported and should never be manually called.
 
@@ -424,16 +317,59 @@ async function loadPersistentDataObjects_Async( data_path, options = {} ){
 	}
 
 	try{
-		PathsObject = await paths_object_promise;
+		SaveSaver.setPathsObject( await paths_object_promise );
 	} catch(error){
-		return_error = new Error(`await paths_object_promise threw an error: ${error}`);
+		return_error = new Error(`SaveSaver.setPathsObject threw an error: ${error}`);
 		throw return_error;
 	}
 	try{
-		BackupsObject = await backups_object_promise;
+		SaveSaver.setBackupsObject( await backups_object_promise );
 	} catch(error){
-		return_error = new Error(`await backups_object_promise threw an error: ${error}`);
+		return_error = new Error(`SaveSaver.setBackupsObject threw an error: ${error}`);
 		throw return_error;
+	}
+}
+/**
+### CLI_Command_Help (Async)
+> Implements the `help` subcommand.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| command_options | {Object} | The options specific to the subcommand. \[default: {}\] |
+| options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+async function CLI_Command_Help( command_options = {}, options = {} ){
+	var arguments_array = Array.from(arguments);
+	var return_error;
+	const FUNCTION_NAME = 'CLI_Command_Help';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	//Parametre checks
+	if( typeof(command_options) !== 'object' ){
+		return_error = new TypeError('Param "command_options" is not an Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+	if( typeof(options) !== 'object' ){
+		return_error = new TypeError('Param "options" is not an Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	for( var i = 0; i < command_options.subcommand.length; i++ ){
+		if( command_options.subcommand[i] === CLIDefinitions
 	}
 }
 /**
@@ -546,206 +482,8 @@ if(require.main === module){
 		const CommandLineUsage = require('command-line-usage');
 	//Constants
 	//EnvironmentPaths = EnvPaths( PROCESS_NAME );
-	const CLIDefintions = [
-		{ name: null, description: 'Simply backup and restore save data and configuration files for your games.', synopsis: '$ save-saver (options)', options: [
-			//UI
-			{ name: 'help', alias: 'h', type: Boolean, description: 'Writes this help text to STDOUT.' },
-			{ name: 'noop', alias: 'n', type: Boolean, description: '[Reserved] Show what would be done without actually doing it.' },
-			{ name: 'verbose', alias: 'v', type: Boolean, description: 'Verbose output to STDERR.' },
-			{ name: 'version', alias: 'V', type: Boolean, description: 'Writes version information to STDOUT.' },
-			{ name: 'no-quick-exit', alias: 'x', type: Boolean, description: 'Don\'t immediately exit after printing help, version, and/or config information.' },
-			/*//Input
-			{ name: 'stdin', alias: 'i', type: Boolean, description: 'Read input from STDIN.' },
-			{ name: 'input', alias: 'I', type: String, description: 'The path to the file to read input from.' },
-			//Output
-			{ name: 'stdout', alias: 'o', type: Boolean, description: 'Write output to STDOUT.' },
-			{ name: 'output', alias: 'O', type: String, description: 'The name of the file to write output to.' },
-			{ name: 'pasteboard', alias: 'p', type: Boolean, description: '[Reserved] Copy output to pasteboard (clipboard).' },*/
-			//Config
-			{ name: 'config', alias: 'c', type: Boolean, description: 'Print search paths and configuration values to STDOUT.' },
-			{ name: 'config-file', alias: 'C', type: String, description: '[Resevred] Use the given config file instead of the default.' },
-			//Low-Level
-			{ name: 'override-paths-object-path', type: String, description: 'Specify a path to read the PathsObject from instead of the default. Takes precedent over `override-data-directory-path`.' },
-			{ name: 'override-backups-object-path', type: String, description: 'Specify a path to read the BackupsObject from instead of the default. Takes precedent over `override-data-directory-path`.' },
-			{ name: 'override-data-directory-path', type: String, description: 'Specify a directory to search for the PathsObject and BackupsObject files instead of the default.' }
-		] },
-		{ name: 'help', description: 'Writes a helpful synopsis for the given subcommand to STDOUT.', synopsis: '$ save-saver help <subcommand>', options: [
-			{ name: 'subcommand', alias: 'S', type: String, multiple: true, defaultOption: true, description: 'The subcommand(s) to write help text for.' }
-		] },
-		{ name: 'add-source', description: 'Adds a new source to the `Paths.json` index file.', synopsis: '$ save-saver add-source (options)', options: [
-			{ name: 'force', alias: 'f', type: Boolean, description: 'Do not ask for comfirmation in the new source would overwrite an existing one.' },
-			{ name: 'edit', alias: 'e', type: Boolean, description: 'Edit the source record in $EDITOR.' },
-			{ name: 'name', alias: 'N', type: String, defaultOption: true, description: 'The name of the source as it will appear in `Paths.json`.' },
-			{ name: 'alias', alias: 'A', type: String, multiple: true, description: 'An alias which can also be used to refer to the source. Can be specified multiple times.' },
-			{ name: 'config', alias: 'C', type: String, description: 'A glob for the config files to backup.' },
-			{ name: 'saves', alias: 'S', type: String, description: 'A glob for the save files to backup.' },
-			{ name: 'data', alias: 'D', type: String, description: 'A glob for the data files to backup.' }
-		] },
-		{ name: 'list-sources', description: 'List the sources currently present in `Paths.json`.' synopsis: '$ save-saver list-sources (options)', options: [
-			{ name: 'alias', alias: 'a', type: Boolean, description: 'Include aliases in the list.' }
-		] },
-		{ name: 'remove-source', description: 'Removes a source and its aliases from `Paths.json`.', synopsis: '$ save-saver remove-source (options) <sources...>', options: [
-			{ name: 'force', alias: 'f', type: Boolean, description: 'Do not ask for comfirmation when deleting a source and its data.' },
-			{ name: 'alias-only', alias: 'a', type: Boolean, description: 'Only remove aliases, leaving sources mainly intact.' },
-			{ name: 'with-backups', alias: 'a', type: Boolean, description: 'Delete any existing backups belonging to the source aswell.' }
-		] },
-		{ name: 'backup', description: 'Creates a new backup for the given source.', synopsis: '$ save-saver backup (options) <source name> <subsource>', options: [
-			{ name: 'message', alias: 'm', type: String, description: 'A message to associate with the backup.' }
-			{ name: 'automatic', alias: 'a', type: Boolean, description: 'Automatically backup any sources that have been changed since the last run.' }
-		] },
-		{ name: 'list-backups', description: 'Lists the backups for the given source.', synopsis: '$ save-saver list-backups <source> (options)', options: [
-			{ name: 'oldest', alias: 'o', type: Boolean, description: 'Invert the list order to show the oldest at the bottom.' },
-			{ name: 'count', alias: 'C', type: Number, defaultValue: 10, description: 'Specifies how many backups to show in the resulting list. [Default: 10]' }
-		] },
-		{ name: 'restore', description: 'Restores the backup with the given ID.', synposis: '$ save-saver restore <backup ID> (options)', options: [
-			{ name: 'id', alias: 'I', type: String, defaultOption: true, description: 'The ID of the backup to be restored.' }
-		] },
-		{ name: 'delete-backup', description: 'Deletes the backup with the given ID.', synopsis: '$ save-saver delete-backup <backup ID> (options)', options: [
-			{ name: 'id', alias: 'I', type: String, defaultOption: true, description: 'The ID of the backup to be deleted.' }
-		] }
-	];
-	//Variables
-	var function_return = [1,null];
-	var quick_exit = false;
-	var config_path = '';
-	var source_dirname = '';
-	var parent_dirname = '';
-	var package_path = '';
-	var env_paths_object = {};
-	var commands_array = [];
-	var global_options = {};
-	var command = '';
-	var command_options = {};
-	//EnvironmentPaths
-	try{
-		env_paths_object = EnvPaths('save-saver');
-		try{
-			setEnvironmentPaths( env_paths_object );
-		} catch(error){
-			return_error = new Error(`setEnvironmentPaths threw an error: ${error}`);
-			throw return_error;
-		}
-	} catch(error)/* istanbul ignore next */{
-		return_error = new Error(`EnvPaths threw an error: ${error}`);
-		throw return_error;
-	}
-	//Logger
-	try{ 
-		MakeDir.sync( EnvironmentPaths.log );
-	} catch(error)/* istanbul ignore next */{
-		console.error('MakeDir.sync threw: %s', error);
-	}
-	function_return = ApplicationLogWinstonInterface.InitLogger('debug.log', EnvironmentPaths.log);
-	if( function_return[0] === 0 ){
-		setLogger( function_return[1] );
-	}
-	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: 'Start of execution block.'});
-	//#### CLI
-	//##### Options
-	for( var i = 0; i < CLIDefinitions.length; i++ ){
-		commands_array.push( CLIDefinitions[i].name );
-	}
-	try{
-		global_options = CommandLineArgs( CLIDefinitions[0], { stopAtFirstUnknown: true } );
-	} catch(error)/* istanbul ignore next */{
-		return_error = new Error(`CommandLineArgs threw an error: ${error}`);
-		throw return_error;
-	}
-	try{
-		command = CommandLineCommands( commands_array );
-	} catch(error)/* istanbul ignore next */{
-		return_error = new Error(`CommandLineCommands threw an error: ${error}`);
-		throw return_error;
-	}
-	if( command != null ){
-		for( var i = 0; i < CLIDefinitions.length; i++ ){
-			if( command === CLIDefinitions[i].name ){
-				try{
-					command_options = CommandLineArgs( CLIDefinitions[i].options );
-				} catch(error)js\iin{
-					return_error = new Error(`CommandLineArgs threw an error: ${error}`);
-					throw return_error;
-				}
-			}
-		}
-	}
-	//Config
-	try{
-		MakeDir.sync( EnvironmentPaths.data );
-	} catch(error){
-		return_error = new Error(`MakeDir.sync threw an error: ${error}`);
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: `${return_error}`});
-	}
-	try{
-		MakeDir.sync( EnvironmentPaths.config );
-	} catch(error){
-		return_error = new Error(`MakeDir.sync threw an error: ${error}`);
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: `${return_error}`});
-	}
-	try{
-		ConfigObject.paths_object_path = Path.join( EnvironmentPaths.data, 'Paths.json' );
-	} catch(error){
-		return_error = new Error(`Path.join threw an error: ${error}`);
-		//throw return_error;
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-	}
-	try{
-		ConfigObject.backups_object_path = Path.join( EnvironmentPaths.data, 'Backups.json' );
-	} catch(error){
-		return_error = new Error(`Path.join threw an error: ${error}`);
-		//throw return_error;
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-	}
-	//Load config.hjson
-	try{
-		if( global_options['config-file'] !== '' ){
-			loadConfigFile( global_options['config-file'] );
-		} else{
-			loadConfigFile();
-		}
-	} catch(error){
-		return_error = new Error(`loadConfigFile threw an error: ${error}`);
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
-	}
-	/* istanbul ignore next */
-	if( global_options.verbose === true ){
-		Logger.real_transports.console_stderr.level = 'debug';
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `Logger: console_stderr transport log level set to: ${Logger.real_transports.console_stderr.level}`});
-	}
-	///Load package.json
-	try{
-		source_dirname = Path.dirname( module.filename );
-		package_path = Path.join( source_dirname, 'package.json' );
-		PACKAGE_JSON = require(package_path);
-	} catch(error){
-		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `Soft error: ${error}`});
-		try{
-			parent_dirname = Path.dirname( source_dirname );
-			package_path = Path.join( parent_dirname, 'package.json' );
-			PACKAGE_JSON = require(package_path);
-		} catch(error)/* istanbul ignore next */{
-			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `Soft error: ${error}`});
-		}
-	}
-	//Main
-	/* istanbul ignore next */
-	if( global_options.version === true ){
-		console.log(PACKAGE_JSON.version);
-		quick_exit = true;
-	}
 	/* istanbul ignore next */
 	if( global_options.help === true ){
-//		{ name: 'help', usage: [
-//			{
-//				header: 'help',
-//				content: 'Writes a helupful synopsis for the given subcommand to STDOUT.'
-//			},
-//			{
-//				header: 'Synopsis',
-//				content: '$ save-saver help <subcommand>'
-//			}
-//		]
-//		},
 		const help_sections_array = [
 			{
 				header: 'save-saver',
