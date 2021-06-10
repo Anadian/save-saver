@@ -1,0 +1,47 @@
+{
+	title: "BackupsJSON",
+	description: "A JSON file functioning as the index for all your backups.",
+	type: "object",
+	properties: {
+		last_write: {
+			type: "string",
+			description: "The last time the `Backups.json` file itself was written as an ISO-8601/RFC-3339 UTC `date-time` string; example: `2000-12-30T23:59:59.999Z`",
+			format: "date-time"
+		},
+		sources: {
+			type: "object",
+			description: "The sources by their identifier.",
+			patternProperties: {
+				"^[A-Za-z0-9_-]+$": {
+					type: "object"
+					description: "The sub-source paths for the source.",
+					patternProperties: {
+						"^[A-Za-z0-9_-]+$": {
+							type: "object",
+							properties: {
+								last_write: {
+									"$ref": "#/$defs/ISODateString"
+								},
+								backups: {
+									type: "array",
+									uniqueItems: true,
+									items: {
+										"$ref": "./backup-object.schema.json"
+									}
+								}
+							},
+							required: [
+								"last_write",
+								"backups"
+							]
+						}
+					}
+				}
+			}
+		}
+	},
+	required: [
+		"last_write",
+		"sources"
+	]
+}

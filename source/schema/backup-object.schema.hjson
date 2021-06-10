@@ -37,6 +37,12 @@
 			}
 		}
 	},
+	required: [
+		"uid",
+		"date",
+		"source",
+		"files"
+	],
 	"$defs":{
 		URLSafeString: {
 			type: "string",

@@ -27,6 +27,10 @@
 			}
 		},
 	},
+	required: [
+		'name',
+		'paths'
+	],
 	"$defs":{
 		URLSafeString: {
 			type: "string",

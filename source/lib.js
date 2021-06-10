@@ -386,7 +386,7 @@ function base64URLStringFromBuffer( input_buffer, options = {} ){
 	return _return;
 }
 /**
-### sha256BufferFromFilePath
+### sha256BufferFromFilePath (Async)
 > Returns a Buffer containing the SHA256 digest of the file at the given path.
 
 Parametres:
@@ -636,7 +636,7 @@ function setSourceObject( source_object, options = {} ){
 	}
 }
 /**
-### createBackup
+### createBackup (Async)
 > Creates a new backup with a given source identifier, either a `name` or an `alias`, a path subsection, and an optional message.
 
 Parametres:
@@ -656,13 +656,14 @@ Throws:
 | code | type | condition |
 | --- | --- | --- |
 | 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+| 'ERR_INVALID_ARG_VALUE' | {Error} | Thrown if the identifier is null or doesn't match a valid source. |
 
 History:
 | version | change |
 | --- | --- |
 | 0.0.1 | WIP |
 */
-function createBackup( identifier, path = 'data', message = '', options = {} ){
+async function createBackup( identifier, path = 'data', message = '', options = {} ){
 	var arguments_array = Array.from(arguments);
 	var _return;
 	var return_error;
@@ -678,6 +679,12 @@ function createBackup( identifier, path = 'data', message = '', options = {} ){
 		subpath: '',
 		files: {}
 	};
+	var source_object = {};
+	var paths_object = {};
+	var normalised_path = '';
+	var include_paths = [];
+	var base_destination_path = '';
+	//var exclude_paths = [];
 	//Parametre checks
 	if( typeof(identifier) !== 'string' ){
 		return_error = new TypeError('Param "identifier" is not string.');
@@ -701,6 +708,91 @@ function createBackup( identifier, path = 'data', message = '', options = {} ){
 	}
 
 	//Function
+	if( identifier != null ){
+		try{
+			source_object = getSourceObject( identifier, options );
+		} catch(error){
+			return_error = new Error(`getSourceObject threw an error: ${error}`);
+			throw return_error;
+		}
+		if( ValidationFunctionsObject['source-object']( source_object ) === true ){
+			if( source_object.paths[path] != undefined && typeof(source_object.paths[path]) === 'object' ){
+				paths_object = source_object.paths[path];
+				backup_object.source = source_object.name;
+				backup_object.subpath = path;
+				backup_object.message = message;
+				try{
+					base_destination_path = Path.join( EnvironmentPaths.data, 'BACKUPS', source_object.name, path, backup_object.uid );
+				} catch(error){
+					return_error = new Error(`Path.join threw an error: ${error}`);
+					throw return_error;
+				}
+				for( var include_path of paths_object.include ){
+					try{
+						normalised_path = Path.posix.normalize( include_path );
+						include_paths.push( normalised_path );
+					} catch(error){
+						return_error = new Error(`For path: "${include_path}" Path.posix.normalize threw an error: ${error}`);
+						//throw return_error;
+					}
+				}
+				for( var exclude_path of paths_object.exclude ){
+					try{
+						normalised_path = Path.posix.normalize( exclude_path );
+						include_paths.push( '!' + normalised_path );
+					} catch(error){
+						return_error = new Error(`For path: "${exclude_path}" Path.posix.normalize threw an error: ${error}`);
+						//throw return_error;
+					}
+				}
+				for await (matched_path of Globby.stream( include_paths, { onlyFiles: true, absolute: true } )){
+					var sha256_buffer_promise = null;
+					sha256_buffer_promise = sha256BufferFromFilePath( matched_path );
+					sha256_buffer_promise.then( (sha256_buffer) => {
+						var base64_string = '';
+						var destination_path = '';
+						var cp_file_promise = null;
+						try{
+							base64_string = base64URLStringFromBuffer( sha256_buffer );
+						} catch(error){
+							return_error = new Error(`base64URLStringFromBuffer threw an error: ${error}`);
+							throw return_error;
+						}
+						try{
+							destination_path = Path.join( base_destination_path, base64_string );
+						} catch(error){
+							return_error = new Error(`Path.join threw an error: ${error}`);
+							throw return_error;
+						}
+						cp_file_promise = CPFile( matched_path, destination_path );
+						cp_file_promise.then( () => {
+							backup_object.files[base64_string] = matched_path;
+						}, (error) => /* istanbul ignore next */ {
+							return_error = new Error(`Failed to copy "${matched_path}" to "${destination_path}"; CPFile threw an error: ${error}`);
+							Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+							throw return_error;
+						} );
+					}, (error) => /* istanbul ignore next */ {
+						return_error = new Error(`sha256BufferFromFilePath threw an error: ${error}`);
+						Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+						throw return_error;
+					} );
+				} //for of
+				BackupsObject[identifier][path].push( backup_object );
+			} else{
+				return_error = new Error(`No recognised path subsection "${path}" in the source object: ${source_object}`);
+				throw return_error;
+			}
+		} else{
+			return_error = new Error(`Obtained SourceObject is not valid: ${source_object}`);
+			return_error.code = 'ERR_INVALID_ARG_VALUE';
+			throw return_error;
+		}
+	} else{
+		return_error = new Error('Param "identifier" is null.');
+		return_error.code = 'ERR_INVALID_ARG_VALUE';
+		throw return_error;
+	}
 
 	//Return
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `returned: ${_return}`});
