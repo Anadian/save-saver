@@ -1,7 +1,6 @@
 {
-	//"$schema": "https://json-schema.org/draft/2020-12/schema",
 	"title": "SourceObject",
-	"description": "A JSON schema describing the format for entries in the `Paths.json` file, known as \"source objects.\"",
+	"description": "A JSON schema describing the format for entries in the `Sources.json` file, known as \"source objects.\"",
 	"type": "object",
 	"properties": {
 		name: {
