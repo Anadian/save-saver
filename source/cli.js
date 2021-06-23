@@ -810,7 +810,7 @@ if(require.main === module){
 	}
 	try{
 		command = CommandLineCommands( commands_array, global_options._unknown );
-		console.log(command, commands_array);
+		//console.log(command, commands_array);
 	} catch(error)/* istanbul ignore next */{
 		return_error = new Error(`CommandLineCommands threw an error: ${error}`);
 		throw return_error;
@@ -819,7 +819,7 @@ if(require.main === module){
 		for( var i = 0; i < CLIDefinitions.length; i++ ){
 			if( command.command === CLIDefinitions[i].name ){
 				try{
-					console.log( i, CLIDefinitions[i], command.argv );
+					//console.log( i, CLIDefinitions[i], command.argv );
 					command_options = CommandLineArgs( CLIDefinitions[i].options, { argv: command.argv } );
 					//CLIDefinitions[i].func( command_options, global_options )
 				} catch(error)/* istanbul ignore next */{
