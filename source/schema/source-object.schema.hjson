@@ -1,4 +1,5 @@
 {
+	"$id": "source-object",
 	"title": "SourceObject",
 	"description": "A JSON schema describing the format for entries in the `Sources.json` file, known as \"source objects.\"",
 	"type": "object",
@@ -24,7 +25,7 @@
 					"$refs": "#/$defs/PathSubSection"
 				}
 			}
-		},
+		}
 	},
 	required: [
 		'name',

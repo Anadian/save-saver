@@ -1,15 +1,16 @@
 #!/usr/local/bin/node
 //const FileSystem = require('fs');
 const Sh = require('shelljs');
-const Execa = require('execa');
+const Hjson = require('hjson');
 const Path = require('path');
 
 (async () => {
 	var files = Sh.ls('source/schema/*');
 	for( var file of files ){
 		var basename = Path.basename(file, '.schema.hjson');
-		var ret = await Execa.command(`npx hjson -j source/schema/${basename}.schema.hjson`, { stdio: 'pipe', silent: true });
-		Sh.echo(ret);
-		ret.stdio[1].to(`Resources/schema/${basename}.schema.json`);
+		var file_shellstring = Sh.cat(`source/schema/${basename}.schema.hjson`);
+		var json_object = Hjson.parse(file_shellstring.toString());
+		var json_string = JSON.stringify( json_object, null, '\t' );
+		Sh.echo(json_string).to(`Resources/schema/${basename}.schema.json`);
 	}
 })()

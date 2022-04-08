@@ -72,14 +72,14 @@ const CLIDefinitions = [
 		{ name: 'config', alias: 'c', type: Boolean, description: 'Print search paths and configuration values to STDOUT.' },
 		{ name: 'config-file', alias: 'C', type: String, description: 'Use the given config file instead of the default.' },
 		//Low-Level
-		{ name: 'override-paths-object-path', type: String, description: 'Specify a path to read the PathsObject from instead of the default. Takes precedent over `override-data-directory-path`.' },
-		{ name: 'override-backups-object-path', type: String, description: 'Specify a path to read the BackupsObject from instead of the default. Takes precedent over `override-data-directory-path`.' },
+		{ name: 'override-sources-json-path', type: String, description: 'Specify a path to read the SourcesJSON file from instead of the default. Takes precedent over `override-data-directory-path`.' },
+		{ name: 'override-backups-json-path', type: String, description: 'Specify a path to read the BackupsJSON file from instead of the default. Takes precedent over `override-data-directory-path`.' },
 		{ name: 'override-data-directory-path', type: String, description: 'Specify a directory to search for the PathsObject and BackupsObject files instead of the default.' }
 	] },
 	{ name: 'help', description: 'Writes a helpful synopsis for the given subcommand to STDOUT.', synopsis: '$ save-saver help <subcommand>', options: [
 		{ name: 'subcommand', alias: 'S', type: String, multiple: true, defaultOption: true, description: 'The subcommand(s) to write help text for.' }
 	], func: CLI_Command_Help },
-	{ name: 'add-source', description: 'Adds a new source to the `Paths.json` index file.', synopsis: '$ save-saver add-source [options]', options: [
+	{ name: 'add-source', description: 'Adds a new source to the `Sources.json` index file.', synopsis: '$ save-saver add-source [options]', options: [
 		{ name: 'force', alias: 'f', type: Boolean, description: 'Do not ask for comfirmation in the new source would overwrite an existing one.' },
 		{ name: 'edit', alias: 'e', type: Boolean, description: 'Edit the source record in $EDITOR.' },
 		{ name: 'name', alias: 'N', type: String, defaultOption: true, description: 'The name of the source as it will appear in `Paths.json`.' },
@@ -87,29 +87,43 @@ const CLIDefinitions = [
 		{ name: 'config', alias: 'C', type: String, description: 'A glob for the config files to backup.' },
 		{ name: 'saves', alias: 'S', type: String, description: 'A glob for the save files to backup.' },
 		{ name: 'data', alias: 'D', type: String, description: 'A glob for the data files to backup.' }
-	] },
-	{ name: 'list-sources', description: 'List the sources currently present in `Paths.json`.', synopsis: '$ save-saver list-sources (options)', options: [
-		{ name: 'alias', alias: 'a', type: Boolean, description: 'Include aliases in the list.' }
-	] },
-	{ name: 'remove-source', description: 'Removes a source and its aliases from `Paths.json`.', synopsis: '$ save-saver remove-source (options) <sources...>', options: [
+	], func: CLI_Command_AddSource },
+	{ name: 'list-sources', description: 'List the sources currently present in `Sources.json`.', synopsis: '$ save-saver list-sources (options)', options: [
+		//columns
+		{ name: 'alias', alias: 'a', type: Boolean, description: 'Include aliases in the list.' },
+		{ name: 'paths', alias: 'p', type: Boolean, description: 'Include paths in the list.' },
+		//filters
+		/*{ name: 'glob', alias: 'g', type: String, description: 'Only include sources matching the given glob in the list.' },
+		{ name: 'regex', alias: 'r', type: String, description: 'Only include sources matching the given regex in the list.' },
+		{ name: 'path', alias: 'P', type: String, description: 'Only include sources with a path matching the given string in the list.' },
+		{ name: 'path-glob', alias: 'G', type: String, description: 'Only include sources with a path matching the given glob in the list.' },
+		{ name: 'path-regex', alias: 'R', type: String, description: 'Only include sources with a path matching the given regex in the list.' },*/
+		{ name: 'include-regex', alias: 'i', type: String, multiple: true, description: 'A regex to filter what sources will be included in the listing; may be specified multiple times: a source must match all of the given regexes.' },
+		{ name: 'exclude-regex', alias: 'x', type: String, multiple: true, description: 'A regex to filter what sources will be included in the listing; may be specified multiple times and along side the `include-regex` option: a source must NOT match any of these regexes to be included.' },
+		//format
+		{ name: 'invert', alias: 'I', type: Boolean, description: 'Invert the order sources will be listed.' },
+		{ name: 'json', alias: 'j', type: Boolean, description: 'Display the list as JSON instead of pretty printing.' }
+
+	], func: CLI_Command_ListSources },
+	{ name: 'remove-source', description: 'Removes a source and its aliases from `Sources.json`.', synopsis: '$ save-saver remove-source (options) <sources...>', options: [
 		{ name: 'force', alias: 'f', type: Boolean, description: 'Do not ask for comfirmation when deleting a source and its data.' },
 		{ name: 'alias-only', alias: 'a', type: Boolean, description: 'Only remove aliases, leaving sources mainly intact.' },
 		{ name: 'with-backups', alias: 'a', type: Boolean, description: 'Delete any existing backups belonging to the source aswell.' }
-	] },
+	], func: null },//CLI_Command_RemoveSource },
 	{ name: 'backup', description: 'Creates a new backup for the given source.', synopsis: '$ save-saver backup (options) <source name> <subsource>', options: [
 		{ name: 'message', alias: 'm', type: String, description: 'A message to associate with the backup.' },
 		{ name: 'automatic', alias: 'a', type: Boolean, description: 'Automatically backup any sources that have been changed since the last run.' }
-	] },
+	], func: null },//CLI_Command_Backup },
 	{ name: 'list-backups', description: 'Lists the backups for the given source.', synopsis: '$ save-saver list-backups <source> (options)', options: [
 		{ name: 'oldest', alias: 'o', type: Boolean, description: 'Invert the list order to show the oldest at the bottom.' },
 		{ name: 'count', alias: 'C', type: Number, defaultValue: 10, description: 'Specifies how many backups to show in the resulting list. [Default: 10]' }
-	] },
+	], func: null },//CLI_Command_ListBackups },
 	{ name: 'restore', description: 'Restores the backup with the given ID.', synposis: '$ save-saver restore <backup ID> (options)', options: [
 		{ name: 'id', alias: 'I', type: String, defaultOption: true, description: 'The ID of the backup to be restored.' }
-	] },
+	], func: null },//CLI_Command_Restore },
 	{ name: 'delete-backup', description: 'Deletes the backup with the given ID.', synopsis: '$ save-saver delete-backup <backup ID> (options)', options: [
 		{ name: 'id', alias: 'I', type: String, defaultOption: true, description: 'The ID of the backup to be deleted.' }
-	] }
+	], func: null },//CLI_Command_DeleteBackup }
 ];
 //## Errors
 
@@ -361,12 +375,12 @@ function loadConfigFile( config_filepath = '' ){
 }
 /**
 ### loadPersistentDataObjects_Async (private)
-> Loads any existing data to the global `PathsObject` and `BackupsObject`. Not exported and should never be manually called.
+> Loads any existing data to the global `SourcesJSON` and `BackupsJSON`. Not exported and should never be manually called.
 
 Parametres:
 | name | type | description |
 | --- | --- | --- |
-| data_path | {String} | The path to search for the `Paths.json` and `Backups.json` files in if not overridden by the runtime options.  |
+| data_path | {String} | The path to search for the `Sources.json` and `Backups.json` files in if not overridden by the runtime options.  |
 | options | {?Object} | Additional run-time options. Paths can be overridden from command-line/config options. \[default: {}\] |
 
 Throws:
@@ -379,18 +393,18 @@ History:
 | --- | --- |
 | 0.0.1 | WIP |
 */
-async function loadPersistentDataObjects_Async( data_path, options = {} ){
+async function loadPersistentDataObjects_Async( data_path = EnvironmentPaths.data, options = {} ){
 	var arguments_array = Array.from(arguments);
 	var return_error;
 	const FUNCTION_NAME = 'loadPersistentDataObjects_Async';
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
 	//Variables
-	var paths_object_path = '';
-	var backups_object_path = '';
+	var sources_json_path = '';
+	var backups_json_path = '';
 	//var paths_json_string_promise = null;
 	//var backups_json_string_promise = null;
-	var paths_object_promise = null;
-	var backups_object_promise = null;
+	var sources_json_promise = null;
+	var backups_json_promise = null;
 	var eol_fix_function = data_string => { return data_string.replace( /\r\n/g, '\n' ); };
 	var parse_json_function = json_string => {
 		var _return = null;
@@ -416,22 +430,25 @@ async function loadPersistentDataObjects_Async( data_path, options = {} ){
 	}
 
 	//Function
-	if( options['override-paths-object-path'] != null ){
-		paths_object_path = options['override-paths-object-path'];
+	if( options['override-data-directory-path'] != null && typeof(options['override-data-directory-path']) === 'string' ){
+		data_path = options['override-data-directory-path'];
+	}
+	if( options['override-sources-json-path'] != null ){
+		sources_json_path = options['override-sources-json-path'];
 	} else{
 		try{
-			paths_object_path = Path.join( EnvironmentPaths.data, 'Paths.json' );
+			sources_json_path = Path.join( data_path, 'Sources.json' );
 		} catch(error){
 			return_error = new Error(`Path.join threw an error: ${error}`);
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: `${return_error}`});
 			throw return_error;
 		}
 	}
-	if( paths_object_path !== '' ){
+	if( sources_json_path !== '' ){
 		try{
-			FileSystem.accessSync( paths_object_path );
+			FileSystem.accessSync( sources_json_path );
 			try{
-				paths_object_promise = FileSystem.promises.readFile( paths_object_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
+				sources_json_promise = FileSystem.promises.readFile( sources_json_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
 			} catch(error){
 				return_error = new Error(`FileSystem.promises.readFile threw an error: ${error}`);
 				throw return_error;
@@ -439,25 +456,25 @@ async function loadPersistentDataObjects_Async( data_path, options = {} ){
 		} catch(error){
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `FileSystem.accessSync threw an error: ${error}`});
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: '`Paths.json` does not exist; attempting to create one.'});
-			paths_object_promise = Promise.resolve( {} );
+			sources_json_promise = Promise.resolve( {} );
 		}
 	}
-	if( options['override-backups-object-path'] != null ){
-		backups_object_path = options['override-backups-object-path'];
+	if( options['override-backups-json-path'] != null ){
+		backups_json_path = options['override-backups-json-path'];
 	} else{
 		try{
-			backups_object_path = Path.join( EnvironmentPaths.data, 'Backups.json' );
+			backups_json_path = Path.join( EnvironmentPaths.data, 'Backups.json' );
 		} catch(error){
 			return_error = new Error(`Path.join threw an error: ${error}`);
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: `${return_error}`});
 			throw return_error;
 		}
 	}
-	if( backups_object_path !== '' ){
+	if( backups_json_path !== '' ){
 		try{
-			FileSystem.accessSync( backups_object_path );
+			FileSystem.accessSync( backups_json_path );
 			try{
-				backups_object_promise = FileSystem.promises.readFile( backups_object_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
+				backups_json_promise = FileSystem.promises.readFile( backups_json_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
 			} catch(error){
 				return_error = new Error(`FileSystem.promises.readFile threw an error: ${error}`);
 				throw return_error;
@@ -465,18 +482,18 @@ async function loadPersistentDataObjects_Async( data_path, options = {} ){
 		} catch(error){
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `FileSystem.accessSync threw an error: ${error}`});
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: '`Backups.json` does not exist; attempting to create one.'});
-			backups_object_promise = Promise.resolve( {} );
+			backups_json_promise = Promise.resolve( {} );
 		}
 	}
 
 	try{
-		SaveSaver.setPathsObject( await paths_object_promise );
+		SaveSaver.setSourcesObject( await sources_json_promise );
 	} catch(error){
 		return_error = new Error(`SaveSaver.setPathsObject threw an error: ${error}`);
 		throw return_error;
 	}
 	try{
-		SaveSaver.setBackupsObject( await backups_object_promise );
+		SaveSaver.setBackupsObject( await backups_json_promise );
 	} catch(error){
 		return_error = new Error(`SaveSaver.setBackupsObject threw an error: ${error}`);
 		throw return_error;
@@ -640,7 +657,7 @@ async function CLI_Command_AddSource( command_options = {}, global_options = {} 
 			}
 		} else if( command_options.edit === true ){
 			try{
-				inquirer_answer = await Inquirer.prompt( iqnuirer_questions );
+				inquirer_answer = await Inquirer.prompt( inquirer_questions );
 			} catch(error){
 				return_error = new Error(`await Inquirer.prompt threw an error: ${error}`);
 				throw return_error;
@@ -685,6 +702,111 @@ async function CLI_Command_AddSource( command_options = {}, global_options = {} 
 		}
 	} catch(error){
 		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'crit', message: error});
+		process.exitCode = 1;
+	}
+}
+/**
+### CLI_Command_ListSources
+> List sources in the `Sources.json` file.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| command_options | {Object} | The command-line options specific to the command.  |
+| options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+async function CLI_Command_ListSources( command_options, options = {} ){
+	var arguments_array = Array.from(arguments);
+	var return_error;
+	const FUNCTION_NAME = 'CLI_Command_ListSources';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	var filters_object = {
+		include: [],
+		exclude: []
+	};
+	var sources_array = [];
+	var source_object = {};
+	var index = []; //sorted array of sources with additional information.
+	var row_object = {}; //A single "row" entry in the final index.
+	//Parametre checks
+	if( typeof(command_options) !== 'object' ){
+		return_error = new TypeError('Param "command_options" is not Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+	if( typeof(options) !== 'object' ){
+		return_error = new TypeError('Param "options" is not ?Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	if( command_options['include-regex'] != null && Array.isArray(command_options['include-regex']) === true ){
+		filters_object.include = command_options['include-regex'];
+	}
+	if( command_options['exclude-regex'] != null && Array.isArray(command_options['exclude-regex']) === true ){
+		filters_object.exclude = command_options['exclude-regex'];
+	}
+	try{
+		sources_array = SaveSaver.listSources( filters_object );
+	} catch(error){
+		return_error = new Error(`SaveSaver.listSources threw an error: ${error}`);
+		throw return_error;
+	}
+	for( const source of sources_array ){
+		row_object = {};
+		row_object.name = source_object.name;
+		if( command_options.alias === true || command_options.paths === true ){
+			try{
+				source_object = SaveSaver.getSourceObject( source );
+				if( command_options.alias === true ){
+					row_object.aliases = source_object.aliases;
+				}
+				if( command_options.paths === true ){
+					row_object.paths = source_object.paths;
+				}
+			} catch(error){
+				return_error = new Error(`SaveSaver.getSourceObject threw an error: ${error}`);
+				throw return_error;
+			}
+		}
+		index.push( row_object );
+	}
+	index.sort( (a, b) => {
+		var swap = 0;
+		if( b.name < a.name ){
+			swap = 1;
+		} else{
+			swap = -1;
+		}
+		if( command_options.invert === true ){
+			swap *= -1;
+		}
+		return swap;
+	} );
+	if( command_options.json === true ){
+		console.log( '%j', index );
+	} else{
+		console.log('Name\t|\tAliases\t|\tPaths');
+		console.log('----\t|\t-------\t|\t-----');
+		for( const row of index ){
+			console.log('%s\t|\t%s\t|\t%s', row.name, row.aliases.toString(), Object.keys(row.paths).toString() );
+		}
+	}
+	//Exit
+	if( return_error !== null ){
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'crit', message: return_error});
 		process.exitCode = 1;
 	}
 }
@@ -886,6 +1008,13 @@ if(require.main === module){
 		} catch(error)/* istanbul ignore next */{
 			Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `Soft error: ${error}`});
 		}
+	}
+	//Load schema functions.
+	try{
+		SaveSaver.loadSchemaFunctions();
+	} catch(error){
+		return_error = new Error(`SaveSaver.loadSchemaFunctions threw an error: ${error}`);
+		throw return_error;
 	}
 	//Main
 	/* istanbul ignore next */

@@ -36,7 +36,7 @@ Documentation License: [![Creative Commons License](https://i.creativecommons.or
 
 //# Dependencies
 	//## Internal
-	const Source 
+	const Source = require('./source.js');
 	//## Standard
 	const FileSystem = require('fs');
 	//## External
@@ -191,80 +191,78 @@ function setEnvironmentPaths( environment_paths ){
 	}
 }
 
-class Sources{
-	file_path = '';
-	last_write = '';
-	sources = {};
-	constructor( file_path ){
-		return ( async ( file_path ) => { 
-			var access_promise = null;
-			access_promise = FileSystem.promises.access( file_path, ( FileSystem.constants.R_OK | FileSystem.constants.W_OK ) );
-			access_promise.then( 
-				() => {
+function Sources( file_path ){
+	this.file_path = '';
+	this.last_write = '';
+	this.sources = {};
+	return ( async ( file_path ) => { 
+		var access_promise = null;
+		access_promise = FileSystem.promises.access( file_path, ( FileSystem.constants.R_OK | FileSystem.constants.W_OK ) );
+		access_promise.then( 
+			() => {
+				var _return = null;
+				var object_promise = null;
+				var eol_fix_function = data_string => { return data_string.replace( /\r\n/g, '\n' ); };
+				var parse_json_function = json_string => {
 					var _return = null;
-					var object_promise = null;
-					var eol_fix_function = data_string => { return data_string.replace( /\r\n/g, '\n' ); };
-					var parse_json_function = json_string => {
-						var _return = null;
-						var return_error = null;
-						try{
-							_return = ParseJSON( json_string, null, null );
-						} catch(error){
-							return_error = new Error(`ParseJSON threw an error: ${error}`);
-							throw return_error;
-						}
-						return _return;
-					};
+					var return_error = null;
 					try{
-						object_promise = FileSystem.promises.readFile( file_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
+						_return = ParseJSON( json_string, null, null );
 					} catch(error){
-						return_error = new Error(`FileSystem.promises.readFile threw an error: ${error}`);
+						return_error = new Error(`ParseJSON threw an error: ${error}`);
 						throw return_error;
 					}
-					object_promise.then( (read_object) => {
-						var return_error = null;
-						if( SourcesJSONValidationFunction( read_object ) === true ){
-							this.file_path = file_path;
-							this.last_write = read_object.last_write;
-							try{ 
-								Object.keys( read_object.sources ).forEach( ( item, index ) => {
-									var return_error = null;
-									var source_object = {};
-									try{
-										source_object = new Source( read_source );
-										this.sources[source_object.name] = source_object;
-									} catch(error){
-										return_error = new Error(`Attempting to create a new source for the object at index ${index} of "read_object.sources" threw an error: ${error}`);
-										throw return_error; //possibly recover.
-									} 
-								} );
-							} catch(error){
-								return_error = new Error(`An unexpected error occurred while attempting to add the sources from the "read_object": ${error}`);
-								throw return_error;
-							}
-						} else{
-							return_error = new Error('Param "read_object" is not a valid `sources-json` object.');
-							return_error.code = 'ERR_INVALID_ARG_VALUE';
+					return _return;
+				};
+				try{
+					object_promise = FileSystem.promises.readFile( file_path, 'utf8' ).then( eol_fix_function ).then( parse_json_function );
+				} catch(error){
+					return_error = new Error(`FileSystem.promises.readFile threw an error: ${error}`);
+					throw return_error;
+				}
+				object_promise.then( (read_object) => {
+					var return_error = null;
+					if( SourcesJSONValidationFunction( read_object ) === true ){
+						this.file_path = file_path;
+						this.last_write = read_object.last_write;
+						try{ 
+							Object.keys( read_object.sources ).forEach( ( item, index ) => {
+								var return_error = null;
+								var source_object = {};
+								try{
+									source_object = new Source( read_source );
+									this.sources[source_object.name] = source_object;
+								} catch(error){
+									return_error = new Error(`Attempting to create a new source for the object at index ${index} of "read_object.sources" threw an error: ${error}`);
+									throw return_error; //possibly recover.
+								} 
+							} );
+						} catch(error){
+							return_error = new Error(`An unexpected error occurred while attempting to add the sources from the "read_object": ${error}`);
 							throw return_error;
 						}
-						//All good!?
-						return this;
-					},
-					(error) => {
-						return_error = new Error(`'object_promise' resolved with an error: ${error}`);
+					} else{
+						return_error = new Error('Param "read_object" is not a valid `sources-json` object.');
+						return_error.code = 'ERR_INVALID_ARG_VALUE';
 						throw return_error;
-					} ); //object_promise.then
-					return object_promise;
+					}
+					//All good!?
+					return this;
 				},
 				(error) => {
-					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `FileSystem.access threw an error: ${error}`});
-					Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: '`Sources.json` does not exist; attempting to create one.'});
-					object_promise = Promise.resolve( {} );
-				} );
-			return access_promise;
-		} ) //grouping
-	} //constructor
-} //class Sources
+					return_error = new Error(`'object_promise' resolved with an error: ${error}`);
+					throw return_error;
+				} ); //object_promise.then
+				return object_promise;
+			},
+			(error) => {
+				Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: `FileSystem.access threw an error: ${error}`});
+				Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'note', message: '`Sources.json` does not exist; attempting to create one.'});
+				object_promise = Promise.resolve( {} );
+			} );
+		return access_promise;
+	} ); //grouping
+} //function Sources
 
 //# Exports and Execution
 if(require.main === module){

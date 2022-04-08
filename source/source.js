@@ -59,12 +59,25 @@ var Logger = {
 };
 var ConfigObject = {};
 var EnvironmentPaths = {};
+var SourceObjectValidationFunction = null;
 
+//Class
 function Source(){
 	this.name = '';
 	this.aliases = [];
 	this.paths = {};
 }
+//Static Methods
+function Source.setValidationFunction( validation_function = null ){
+	var return_error = null;
+	if( typeof(validation_function) === 'function' || validation_function === null ){
+	} else{
+		return_error = new TypeError('Param `validation_function` is neither a function nor `null`.');
+		return return_error;
+	}
+}
+
+//Methods
 function Source.prototype.FromObject( input_object ){
 		var return_error = null;
 		if( SourceObjectValidationFunction(input_object) === true ){
@@ -98,6 +111,67 @@ function Source.prototype.ToObject( validate = true ){
 		}
 		return _return;
 	}
+}
+/**
+### Source.prototype.getFiles
+> Returns a promise the resolves to an array of all the files matching the globs in the given `subpath`.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| subpath | {string} | Brief parametre description. \[default: ''\] |
+| options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
+
+Returns:
+| type | description |
+| --- | --- |
+| {Promise} | A promise that revolves to an array of file paths matching the globs in the gven `subpath` parametre. |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+function Source.prototype.getFiles( subpath = '', options = {} ){
+	var arguments_array = Array.from(arguments);
+	var _return;
+	var return_error;
+	const FUNCTION_NAME = 'Source.prototype.getFiles';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	var subpath_key = '';
+	//Parametre checks
+	if( typeof(subpath) !== 'string' ){
+		return_error = new TypeError('Param "subpath" is not string.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+	if( typeof(options) !== 'object' ){
+		return_error = new TypeError('Param "options" is not ?Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	if( subpath == '' ){
+		subpath_key = 'data';
+		Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'warn', message: 'No subpath specified; using the default key of \'data\''});
+	} else{
+		subpath_key = subpath;
+	}
+	if( this.paths[subpath_key] != undefined ){
+	} else{
+		return_error = new Error(`Could not find a \`paths\` object matching the given subpath key of \`${subpath_key}\``);
+		jserrorlog(return_error)
+	}
+	//Return
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `returned: ${_return}`});
+	return _return;
 }
 /**
 ## Functions

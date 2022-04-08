@@ -1,4 +1,5 @@
 {
+	"$id": "sources-json",
 	"title": "SourcesJSON",
 	"description": "A JSON schema describing the format for the `Sources.json` file.",
 	"type": "object",
@@ -13,7 +14,7 @@
 			description: "An object containing each source as a `[source-object](./source-object.schema.json)`.",
 			patternProperties: {
 				"^[A-Za-z0-9_-]+$": {
-					"$ref": "./source-object.schema.json"
+					"$ref": "source-object"
 				}
 			}
 		}

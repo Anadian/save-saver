@@ -41,6 +41,7 @@ Documentation License: [![Creative Commons License](https://i.creativecommons.or
 	const Path = require('path');
 	const Cryptography = require('crypto');
 	//## External
+	const ParseJSON = require('parse-json');
 	const MakeDir = require('make-dir');
 	const CPFile = require('cp-file'); 
 	const NanoID = require('nanoid');
@@ -67,10 +68,13 @@ var Logger = {
 };
 var ConfigObject = {};
 var EnvironmentPaths = {};
-var PathsObject = {};
+var SourcesObject = {};
 var BackupsObject = {};
 var ValidationFunctionsObject = {
-	'source-object': null
+	'source-object': null,
+	'sources-json': null,
+	'backup-object': null,
+	'backups-json': null
 };
 /**
 ## Functions
@@ -100,8 +104,9 @@ function loadSchemaFunctions( options = {} ){
 	const FUNCTION_NAME = 'loadSchemaFunctions';
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
 	//Variables
+	var schema_functions_array = [];
 	var file_path = '';
-	//var file_string = '';
+	var schema_string = '';
 	var schema_json = {};
 	var ajv = new AJV();
 	//Parametre checks
@@ -112,31 +117,33 @@ function loadSchemaFunctions( options = {} ){
 	}
 
 	//Function
-	try{
-		file_path = Path.join( 'Resources', 'schema', 'source-object.schema.json' );
-	} catch(error){
-		return_error = new Error(`Path.join threw an error: ${error}`);
-		throw return_error;
+	schema_functions_array = Object.keys(ValidationFunctionsObject);
+	for( const name of schema_functions_array ){
+		try{
+			file_path = Path.join( 'Resources', 'schema', name+'.schema.json' );
+		} catch(error){
+			return_error = new Error(`Path.join threw an error: ${error}`);
+			throw return_error;
+		}
+		try{
+			schema_string = FileSystem.readFileSync( file_path, 'utf8' );
+		} catch(error){
+			return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
+			throw return_error;
+		}
+		try{
+			schema_json = ParseJSON( schema_string );
+		} catch(error){
+			return_error = new Error(`ParseJSON threw an error: ${error}`);
+			throw return_error;
+		}
+		try{
+			ValidationFunctionsObject[name] = ajv.compile( schema_json );
+		} catch(error){
+			return_error = new Error(`ajv.compile threw an error: ${error}`);
+			throw return_error;
+		}
 	}
-	/*try{
-		file_string = FileSystem.readFileSync( file_path, 'utf8' );
-	} catch(error){
-		return_error = new Error(`FileSystem.readFileSync threw an error: ${error}`);
-		throw return_error;
-	}*/
-	try{
-		schema_json = require( file_path );
-	} catch(error){
-		return_error = new Error(`require threw an error: ${error}`);
-		throw return_error;
-	}
-	try{
-		ValidationFunctionsObject['source-object'] = ajv.compile( schema_json );
-	} catch(error){
-		return_error = new Error(`ajv.compile threw an error: ${error}`);
-		throw return_error;
-	}
-
 }
 /**
 ### setLogger
@@ -265,13 +272,13 @@ function setEnvironmentPaths( environment_paths ){
 	}
 }
 /**
-### setSourcePathsObject
+### setSourcesObject
 > Sets the object for the `Paths.json` file containing all of the source entries.
 
 Parametres:
 | name | type | description |
 | --- | --- | --- |
-| paths_object | {Object} | The object to be used as the `Paths` object.  |
+| sources_object | {Object} | The object to be used as the `Sources` object.  |
 
 Throws:
 | code | type | condition |
@@ -283,21 +290,21 @@ History:
 | --- | --- |
 | 0.0.1 | WIP |
 */
-function setSourcePathsObject( paths_object ){
+function setSourcesObject( sources_object ){
 	var arguments_array = Array.from(arguments);
 	var return_error;
-	const FUNCTION_NAME = 'setSourcePathsObject';
+	const FUNCTION_NAME = 'setSourcesObject';
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
 	//Variables
 	//Parametre checks
-	if( typeof(paths_object) !== 'object' ){
-		return_error = new TypeError('Param "paths_object" is not Object.');
+	if( typeof(sources_object) !== 'object' ){
+		return_error = new TypeError('Param "sources_object" is not Object.');
 		return_error.code = 'ERR_INVALID_ARG_TYPE';
 		throw return_error;
 	}
 
 	//Function
-	PathsObject = paths_object;
+	SourcesObject = sources_object;
 }
 /**
 ### setBackupsObject
@@ -412,10 +419,11 @@ History:
 */
 async function sha256BufferFromFilePath( file_path, options = {} ){
 	var arguments_array = Array.from(arguments);
-	var _return;
+	var _return = null;
 	var return_error;
 	const FUNCTION_NAME = 'sha256BufferFromFilePath';
 	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//console.log(`${FUNCTION_NAME} received: ${file_path}`);
 	//Variables
 	var file_handle = null;
 	var file_stats = {};
@@ -480,6 +488,7 @@ async function sha256BufferFromFilePath( file_path, options = {} ){
 			}
 			offset += read_buffer.length;
 		} else if( offset < file_stats.size ){
+			console.log('Hello');
 			try{
 				file_handle.read( read_buffer, 0, (file_stats.size - offset), offset );
 			} catch(error)/* istanbul ignore next */{
@@ -488,6 +497,7 @@ async function sha256BufferFromFilePath( file_path, options = {} ){
 			}
 			try{
 				new_buffer = Buffer.from( read_buffer.buffer, 0, (file_stats.size - offset) );
+				console.log(`${new_buffer.toString('hex')}`);
 			} catch(error)/* istanbul ignore next */{
 				return_error = new Error(`Buffer.from threw an error: ${error}`);
 				throw return_error;
@@ -508,6 +518,127 @@ async function sha256BufferFromFilePath( file_path, options = {} ){
 			}
 			done = true;
 		}
+	}
+
+	//Return
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `returned: ${_return}`});
+	console.log(`${FUNCTION_NAME} returned: ${_return.toString('hex')} from ${JSON.stringify(file_stats)}`);
+	return _return;
+}
+/**
+### listSources
+> Returns an object of all the sources matching the given filters.
+
+Parametres:
+| name | type | description |
+| --- | --- | --- |
+| filters | {object} | An object representing the combined filters. The property `include` will be used as an array of `RegExp`s of which a sources must match all of them to be included. The property `exclude` will be used as an array of `RegExp`s of which a source must not match any of them to be included. Excluding regexes take priority so a source included by the `inlcude` property can still be excluded by a regex in the `exclude` array.  |
+| options | {?Object} | [Reserved] Additional run-time options. \[default: {}\] |
+
+Returns:
+| type | description |
+| --- | --- |
+| {Object} | A `sources-list` object. |
+
+Throws:
+| code | type | condition |
+| --- | --- | --- |
+| 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
+
+History:
+| version | change |
+| --- | --- |
+| 0.0.1 | WIP |
+*/
+function listSources( filters, options = {} ){
+	var arguments_array = Array.from(arguments);
+	var _return;
+	var return_error;
+	const FUNCTION_NAME = 'listSources';
+	Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'debug', message: `received: ${arguments_array}`});
+	//Variables
+	var reduced_sources_array = [];
+	var include_regexps_array = [];
+	var exclude_regexps_array = [];
+	var for_loop_errors = [];
+	//Parametre checks
+	if( typeof(filters) !== 'object' ){
+		return_error = new TypeError('Param "filters" is not object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+	if( typeof(options) !== 'object' ){
+		return_error = new TypeError('Param "options" is not ?Object.');
+		return_error.code = 'ERR_INVALID_ARG_TYPE';
+		throw return_error;
+	}
+
+	//Function
+	if( filters.include != null && Array.isArray(filters.include) === true ){
+		for( var i = 0; i < filters.include.length; i++ ){
+			try{
+				var element = filters.include[i];
+				if( RegExp.prototype.isPrototypeOf(element) === true ){
+					include_regexps_array.push( element );
+				} else if( typeof(element) === 'string' ){
+					try{
+						var new_regex = RegExp(element);
+					} catch(error){
+						return_error = new Error(`RegExp threw an error: ${error}`);
+						throw return_error;
+					}
+					include_regexps_array.push( new_regex );
+				} else{
+					return_error = new Error(`"element" type is not a RegExp nor a string.`);
+					throw return_error;
+				}
+			} catch(error){
+				return_error = new Error(`For loop index ${i} in "include": ${error}`);
+				Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+				for_loop_errors.push(return_error);
+			}
+		}
+	}
+	if( filters.exclude != null && Array.isArray(filters.exclude) === true ){
+		for( var i = 0; i < filters.exclude.length; i++ ){
+			try{
+				var element = filters.exclude[i];
+				if( RegExp.prototype.isPrototypeOf(element) === true ){
+					exclude_regexps_array.push( element );
+				} else if( typeof(element) === 'string' ){
+					try{
+						var new_regex = RegExp(element);
+					} catch(error){
+						return_error = new Error(`RegExp threw an error: ${error}`);
+						throw return_error;
+					}
+					exclude_regexps_array.push( new_regex );
+				} else{
+					return_error = new Error(`"element" type is not a RegExp nor a string.`);
+					throw return_error;
+				}
+			} catch(error){
+				return_error = new Error(`For loop index ${i} in "exclude": ${error}`);
+				Logger.log({process: PROCESS_NAME, module: MODULE_NAME, file: FILENAME, function: FUNCTION_NAME, level: 'error', message: return_error});
+				for_loop_errors.push(return_error);
+			}
+		}
+	}
+	if( for_loop_errors === [] ){
+		for( const source of SourcesObject.sources ){
+			var function_return = include_regexps_array.every( (regex) => {
+				return source.name.match( regex );
+			} );
+			if( function_return === true ){
+				function_return = exclude_regexps_array.some( (regex) => {
+					return source.name.match( regex );
+				} );
+				if( function_return === false ){
+					reduced_sources_array.push( source );
+				}
+			}
+		}
+		_return = reduced_sources_array;
 	}
 
 	//Return
@@ -533,7 +664,7 @@ Throws:
 | code | type | condition |
 | --- | --- | --- |
 | 'ERR_INVALID_ARG_TYPE' | {TypeError} | Thrown if a given argument isn't of the correct type. |
-| 'ERR_INVALID_ARG_VALUE' | {Error} | Thrown if the given `identifier` cannot be found in the `PathsObject`. |
+| 'ERR_INVALID_ARG_VALUE' | {Error} | Thrown if the given `identifier` cannot be found in the `SourcesObject`. |
 
 History:
 | version | change |
@@ -561,10 +692,10 @@ function getSourceObject( identifier, options = {} ){
 	}
 
 	//Function
-	if( PathsObject.sources[indentifier] != undefined ){
-		_return = PathsObject.sources[identifier];
+	if( SourcesObject.sources[indentifier] != undefined ){
+		_return = SourcesObject.sources[identifier];
 	} else{
-		sources_array = Object.values( PathsObject.sources );
+		sources_array = Object.values( SourcesObject.sources );
 		for( var i = 0; i < sources_array.length; i++ ){
 			if( Array.isArray(sources_array[i].aliases) === true && sources_array[i].aliases != null ){
 				for( var j = 0; j < sources_array[i].aliases.length; j++ ){
@@ -628,7 +759,7 @@ function setSourceObject( source_object, options = {} ){
 
 	//Function
 	if( ValidationFunctionsObject['source-object']( source_object ) === true ){
-		PathsObject.sources[source_object.name] = source_object;
+		SourcesObject.sources[source_object.name] = source_object;
 	} else{
 		return_error = new Error('Param "source_object" is not a valid `SourceObject`');
 		return_error.code = 'ERR_INVALID_ARG_VALUE';
@@ -801,13 +932,26 @@ async function createBackup( identifier, path = 'data', message = '', options = 
 
 //# Exports and Execution
 if(require.main === module){
+	( async () => {
+		var sha256_buffer = await sha256BufferFromFilePath( 'test/input/a' );
+		var base64url_string = base64URLStringFromBuffer( sha256_buffer );
+		console.log(`test/input/a: ${base64url_string}`);
+		sha256_buffer = await sha256BufferFromFilePath( 'test/input/b/c' );
+		base64url_string = base64URLStringFromBuffer( sha256_buffer );
+		console.log(`test/input/b/c: ${base64url_string}`);
+		sha256_buffer = await sha256BufferFromFilePath( 'test/input/b/d' );
+		base64url_string = base64URLStringFromBuffer( sha256_buffer );
+		console.log(`test/input/b/d: ${base64url_string}`);
+	} )();
 } else{
+	exports.loadSchemaFunctions = loadSchemaFunctions;
 	exports.setLogger = setLogger;
 	exports.setConfigObject = setConfigObject;
 	exports.setEnvironmentPaths = setEnvironmentPaths;
-	exports.setSourcePathsObject = setSourcePathsObject;
+	exports.setSourcesObject = setSourcesObject;
 	exports.setBackupsObject = setBackupsObject;
 	exports.sha256BufferFromFilePath = sha256BufferFromFilePath;
 	exports.getSourceObject = getSourceObject;
 	exports.setSourceObject = setSourceObject;
+	exports.listSources = listSources;
 }

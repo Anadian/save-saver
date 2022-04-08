@@ -1,0 +1,59 @@
+{
+	"$id": "backup-object",
+	"title": "BackupObject",
+	"description": "An object representing an individual backup.",
+	"type": "object",
+	"properties": {
+		"uid": {
+			"type": "string",
+			"description": "A unique string identifier for the backup.",
+			"pattern": "^[A-Za-z0-9_-]+$",
+			"minLength": 21,
+			"maxLength": 21
+		},
+		"date": {
+			"type": "string",
+			"description": "The date and time the backup was created as an ISO-8601/RFC-3339 UTC `date-time` string; example: `2000-12-30T23:59:59.999Z`.",
+			"format": "date-time"
+		},
+		"message": {
+			"type": "string",
+			"description": "The optional message provided by the user describing the backup when it was created."
+		},
+		"source": {
+			"description": "The name of the source this backup to which this backup pertains.",
+			"$ref": "#/$defs/URLSafeString"
+		},
+		"subpath": {
+			"description": "The named path (subsource) invoked when this backup was created.",
+			"$ref": "#/$defs/URLSafeString"
+		},
+		"files": {
+			"type": "object",
+			"description": "The files which comprise this specific backup. Each one using a Base64URL-encoded SHA256 hash of the file as the key name with an absolute-path string value.",
+			"patternProperties": {
+				"^[A-Za-z0-9=_-]{42,46}$": {
+					"type": [
+						"string",
+						"array"
+					],
+					"items": {
+						"type": "string"
+					}
+				}
+			}
+		}
+	},
+	"required": [
+		"uid",
+		"date",
+		"source",
+		"files"
+	],
+	"$defs": {
+		"URLSafeString": {
+			"type": "string",
+			"pattern": "^[A-Za-z0-9_-]+$"
+		}
+	}
+}

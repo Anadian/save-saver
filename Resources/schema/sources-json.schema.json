@@ -1,0 +1,26 @@
+{
+	"$id": "sources-json",
+	"title": "SourcesJSON",
+	"description": "A JSON schema describing the format for the `Sources.json` file.",
+	"type": "object",
+	"properties": {
+		"last_write": {
+			"type": "string",
+			"description": "The last time the `Sources.json` file itself was written as an ISO-8601/RFC-3339 UTC `date-time` string; example: `2000-12-30T23:59:59.999Z`",
+			"format": "date-time"
+		},
+		"sources": {
+			"type": "object",
+			"description": "An object containing each source as a `[source-object](./source-object.schema.json)`.",
+			"patternProperties": {
+				"^[A-Za-z0-9_-]+$": {
+					"$ref": "source-object"
+				}
+			}
+		}
+	},
+	"required": [
+		"last_write",
+		"sources"
+	]
+}
